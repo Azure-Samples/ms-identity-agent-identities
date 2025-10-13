@@ -9,8 +9,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
     <PackageReference Include="Microsoft.Graph" Version="5.70.0" />
-    <PackageReference Include="Microsoft.Identity.Web.AgentIdentities" Version="3.10.0" />
-    <PackageReference Include="Microsoft.Identity.Web.GraphServiceClient" Version="3.10.0" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="3.14.1" />
+    <PackageReference Include="Microsoft.Identity.Web.AgentIdentities" Version="3.14.1" />
+    <PackageReference Include="Microsoft.Identity.Web.GraphServiceClient" Version="3.14.1" />
   </ItemGroup>
 
   <ItemGroup>

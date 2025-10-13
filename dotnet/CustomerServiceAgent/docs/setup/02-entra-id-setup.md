@@ -168,7 +168,7 @@ Edit `src/AgentOrchestrator/appsettings.json`:
     "ClientSecret": "YOUR_ORCHESTRATOR_CLIENT_SECRET"
   },
   "AgentIdentities": {
-    "AutonomousAgentId": "YOUR_AUTONOMOUS_AGENT_ID",
+    "AgentIdentity": "YOUR_AUTONOMOUS_AGENT_ID",
     "AgentUserId": "YOUR_AGENT_USER_ID"
   },
   "Services": {

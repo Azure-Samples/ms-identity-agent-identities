@@ -9,7 +9,7 @@ namespace ShippingService.Controllers;
 /// <summary>
 /// Shipping API controller - requires authentication with agent user identity
 /// </summary>
-// [Authorize] // Commented for demo - enable for production with Azure AD
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ShippingController : ControllerBase
@@ -27,7 +27,7 @@ public class ShippingController : ControllerBase
     /// Get delivery info by order ID (read operation)
     /// </summary>
     [HttpGet("{orderId}")]
-    // [RequiredScope("Shipping.Read")]
+    [RequiredScope("Shipping.Read")]
     public ActionResult<DeliveryInfo> GetDelivery(string orderId)
     {
         _logger.LogInformation("Fetching delivery info for order {OrderId}", orderId);
@@ -47,7 +47,7 @@ public class ShippingController : ControllerBase
     /// Update delivery info (write operation - requires user context)
     /// </summary>
     [HttpPut("{orderId}")]
-    // [RequiredScope("Shipping.Write")]
+    [RequiredScope("Shipping.Write")]
     public ActionResult<DeliveryInfo> UpdateDelivery(string orderId, [FromBody] DeliveryInfo updatedInfo)
     {
         _logger.LogInformation("Updating delivery info for order {OrderId} by user {User}", 
@@ -74,7 +74,7 @@ public class ShippingController : ControllerBase
     /// Get all deliveries
     /// </summary>
     [HttpGet]
-    // [RequiredScope("Shipping.Read")]
+    [RequiredScope("Shipping.Read")]
     public ActionResult<IEnumerable<DeliveryInfo>> GetAllDeliveries()
     {
         _logger.LogInformation("Fetching all deliveries");

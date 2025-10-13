@@ -9,10 +9,10 @@ namespace EmailService.Controllers;
 /// <summary>
 /// Email API controller - mock email sending
 /// </summary>
-// [Authorize] // Commented for demo - enable for production with Azure AD
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
-// [RequiredScope("Email.Send")]
+[RequiredScope("Email.Send")]
 public class EmailController : ControllerBase
 {
     private readonly EmailSender _emailSender;

@@ -7,4 +7,5 @@ public class OrchestrationRequest
 {
     public required string OrderId { get; set; }
     public string? UserUpn { get; set; }
+    public string? AgentIdentity { get; set; }
 }

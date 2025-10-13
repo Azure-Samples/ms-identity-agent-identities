@@ -9,10 +9,10 @@ namespace CrmService.Controllers;
 /// <summary>
 /// CRM API controller - requires authentication with autonomous agent identity
 /// </summary>
-// [Authorize] // Commented for demo - enable for production with Azure AD
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
-// [RequiredScope("CRM.Read")]
+[RequiredScope("CRM.Read")]
 public class CustomersController : ControllerBase
 {
     private readonly CustomerStore _customerStore;

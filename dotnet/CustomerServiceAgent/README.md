@@ -17,32 +17,52 @@ This sample illustrates:
 
 ## 🏗️ Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Aspire AppHost (localhost:15888)                            │
-│  ┌────────────────────────────────────────────────┐         │
-│  │  Aspire Dashboard                               │         │
-│  │  - Distributed Tracing                          │         │
-│  │  - Logs Aggregation                             │         │
-│  │  - Metrics & Health                             │         │
-│  └────────────────────────────────────────────────┘         │
-└──────────────────────────────────────────────────────────────┘
-                          │
-        ┌─────────────────┴─────────────────┐
-        │                                   │
-        v                                   v
-┌───────────────────┐            ┌──────────────────┐
-│  Orchestrator     │            │  Downstream APIs │
-│  (Port: 7000)     │───────────>│  - Orders (7001) │
-│                   │            │  - CRM (7002)    │
-│  • CustomerService│            │  - Shipping (7003)│
-│    Controller     │            │  - Email (7004)  │
-│  • Agent Identity │            └──────────────────┘
-│    Patterns       │                     │
-└───────────────────┘                     │
-         │                                │
-         └────> Microsoft Entra ID <──────┘
-                (Token Acquisition & Validation)
+```mermaid
+graph TB
+    subgraph "Aspire AppHost"
+        AppHost[AppHost Project<br/>Orchestrates all services]
+        Dashboard[Aspire Dashboard<br/>Traces, Logs, Metrics]
+    end
+    
+    subgraph "Application Services"
+        Orchestrator[Agent Orchestrator API<br/>CustomerServiceController]
+        OrderAPI[Order Service API<br/>In-memory order store]
+        CrmAPI[CRM Service API<br/>In-memory customer history]
+        ShippingAPI[Shipping Service API<br/>In-memory delivery management]
+        EmailAPI[Email Service API<br/>Mock email sender]
+    end
+    
+    subgraph "External Services"
+        EntraID[Microsoft Entra ID<br/>Token Acquisition & Validation]
+    end
+    
+    AppHost -->|Configures & Starts| Orchestrator
+    AppHost -->|Configures & Starts| OrderAPI
+    AppHost -->|Configures & Starts| CrmAPI
+    AppHost -->|Configures & Starts| ShippingAPI
+    AppHost -->|Configures & Starts| EmailAPI
+    
+    Dashboard -.->|Observes Telemetry| Orchestrator
+    Dashboard -.->|Observes Telemetry| OrderAPI
+    Dashboard -.->|Observes Telemetry| CrmAPI
+    Dashboard -.->|Observes Telemetry| ShippingAPI
+    Dashboard -.->|Observes Telemetry| EmailAPI
+    
+    Orchestrator -->|Service Discovery| OrderAPI
+    Orchestrator -->|Service Discovery| CrmAPI
+    Orchestrator -->|Service Discovery| ShippingAPI
+    Orchestrator -->|Service Discovery| EmailAPI
+    
+    Orchestrator -->|Acquire Token| EntraID
+    OrderAPI -->|Validate Token| EntraID
+    CrmAPI -->|Validate Token| EntraID
+    ShippingAPI -->|Validate Token| EntraID
+    EmailAPI -->|Validate Token| EntraID
+    
+    style AppHost fill:#512BD4,color:#fff
+    style Dashboard fill:#512BD4,color:#fff
+    style Orchestrator fill:#0078D4,color:#fff
+    style EntraID fill:#00BCF2,color:#000
 ```
 
 ## 🚀 Quick Start
@@ -174,21 +194,23 @@ To enable real Agent Identities:
 
 ## 🧪 Testing Scenarios
 
-### Scenario 1: Read-Only Operations (Autonomous Agent)
+### Scenario 1: Read-Only Operations (Agent Identity)
 ```json
 POST /api/customerservice/process
 {
-  "orderId": "12345"
+  "orderId": "12345",
+  "agentIdentity": "YOUR_AGENT_IDENTITY_ID"
 }
 ```
-**Expected:** Orders and customer history retrieved using autonomous agent identity.
+**Expected:** Orders and customer history retrieved using agent identity.
 
 ### Scenario 2: Full Orchestration (Agent User Identity)
 ```json
 POST /api/customerservice/process
 {
   "orderId": "12345",
-  "userUpn": "agent@contoso.com"
+  "userUpn": "agent@contoso.com",
+  "agentIdentity": "YOUR_AGENT_USER_ID"
 }
 ```
 **Expected:** All operations complete, including shipping update and email notification using agent user identity.

@@ -43,11 +43,11 @@ public class CustomerServiceController : ControllerBase
 
         try
         {
-            // Step 1: Get order details using autonomous agent identity (read operation)
-            _logger.LogInformation("Step 1: Fetching order details using autonomous agent identity");
-            result.Messages.Add("Fetching order details using autonomous agent identity...");
+            // Step 1: Get order details using agent identity (read operation)
+            _logger.LogInformation("Step 1: Fetching order details using agent identity");
+            result.Messages.Add("Fetching order details using agent identity...");
             
-            result.OrderDetails = await _orchestrationService.GetOrderDetailsAsync(request.OrderId);
+            result.OrderDetails = await _orchestrationService.GetOrderDetailsAsync(request.OrderId, request.AgentIdentity);
             
             if (result.OrderDetails == null)
             {
@@ -58,11 +58,11 @@ public class CustomerServiceController : ControllerBase
 
             result.Messages.Add($"Order {request.OrderId} retrieved successfully");
 
-            // Step 2: Get customer history using autonomous agent identity (read operation)
-            _logger.LogInformation("Step 2: Fetching customer history using autonomous agent identity");
-            result.Messages.Add("Fetching customer history using autonomous agent identity...");
+            // Step 2: Get customer history using agent identity (read operation)
+            _logger.LogInformation("Step 2: Fetching customer history using agent identity");
+            result.Messages.Add("Fetching customer history using agent identity...");
             
-            result.CustomerHistory = await _orchestrationService.GetCustomerHistoryAsync(result.OrderDetails.CustomerId);
+            result.CustomerHistory = await _orchestrationService.GetCustomerHistoryAsync(result.OrderDetails.CustomerId, request.AgentIdentity);
             
             if (result.CustomerHistory != null)
             {
@@ -92,7 +92,8 @@ public class CustomerServiceController : ControllerBase
                 result.DeliveryInfo = await _orchestrationService.UpdateDeliveryAsync(
                     request.OrderId, 
                     updatedDelivery, 
-                    request.UserUpn);
+                    request.UserUpn,
+                    request.AgentIdentity);
 
                 if (result.DeliveryInfo != null)
                 {
@@ -111,7 +112,7 @@ public class CustomerServiceController : ControllerBase
                     From = "customerservice@example.com"
                 };
 
-                result.EmailSent = await _orchestrationService.SendEmailAsync(emailRequest, request.UserUpn);
+                result.EmailSent = await _orchestrationService.SendEmailAsync(emailRequest, request.UserUpn, request.AgentIdentity);
                 
                 if (result.EmailSent)
                 {

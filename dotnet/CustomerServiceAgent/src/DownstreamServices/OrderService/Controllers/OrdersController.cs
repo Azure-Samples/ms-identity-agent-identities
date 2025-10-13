@@ -9,10 +9,10 @@ namespace OrderService.Controllers;
 /// <summary>
 /// Order API controller - requires authentication with autonomous agent identity
 /// </summary>
-// [Authorize] // Commented for demo - enable for production with Azure AD
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
-// [RequiredScope("Orders.Read")]
+[RequiredScope("Orders.Read")]
 public class OrdersController : ControllerBase
 {
     private readonly OrderStore _orderStore;
