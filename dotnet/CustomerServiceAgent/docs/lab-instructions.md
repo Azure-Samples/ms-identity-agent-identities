@@ -190,8 +190,8 @@ Open `src/DownstreamServices/OrderService/Program.cs`:
 
 ```csharp
 // Lines 10-11: Token validation configuration
-builder.Services.AddMicrosoftIdentityWebApiAuthentication(
-    builder.Configuration, "AzureAd");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(builder.Configuration, "AzureAd");
 ```
 
 Open `src/DownstreamServices/OrderService/Controllers/OrdersController.cs`:

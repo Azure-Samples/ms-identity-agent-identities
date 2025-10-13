@@ -10,8 +10,10 @@ builder.AddServiceDefaults();
 // Add Microsoft Identity Web with agent identities support
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApi(builder.Configuration, "AzureAd")
-    .EnableTokenAcquisitionToCallDownstreamApi()
-    .AddInMemoryTokenCaches();
+        .EnableTokenAcquisitionToCallDownstreamApi()
+        .AddInMemoryTokenCaches();
+
+builder.Services.AddAgentIdentities();
 
 // Register orchestration service
 builder.Services.AddSingleton<OrchestrationService>();

@@ -51,11 +51,7 @@ System.IO.IOException: Failed to bind to address https://localhost:7000
 ```
 
 **Solution:**
-Edit `src/CustomerServiceAgent.AppHost/Program.cs` and change port numbers:
-```csharp
-var orchestrator = builder.AddProject("agentorchestrator", "../AgentOrchestrator/AgentOrchestrator.csproj")
-    .WithHttpsEndpoint(port: 8000, name: "https");  // Changed from 7000
-```
+The sample uses Aspire's default port assignment. If you need specific ports, you can configure them in the launchSettings.json files of each service.
 
 ### ❌ Aspire Dashboard not accessible
 **Symptom:**

@@ -216,13 +216,13 @@ Edit `src/DownstreamServices/[ServiceName]/appsettings.json`:
 Uncomment the authentication configuration:
 
 ```csharp
-// Uncomment these lines:
-builder.Services.AddMicrosoftIdentityWebApiAuthentication(builder.Configuration, "AzureAd")
-    .EnableTokenAcquisitionToCallDownstreamApi()
-    .AddAgentIdentities(builder.Configuration);
+// Use this pattern:
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(builder.Configuration, "AzureAd")
+        .EnableTokenAcquisitionToCallDownstreamApi()
+        .AddInMemoryTokenCaches();
 
-// Comment out or remove the mock provider:
-// builder.Services.AddSingleton<IAuthorizationHeaderProvider, MockAuthorizationHeaderProvider>();
+builder.Services.AddAgentIdentities();
 ```
 
 #### Downstream Services (All Controllers)
