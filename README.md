@@ -9,8 +9,8 @@ This repository contains samples demonstrating how to use **Agent Identities** i
 [![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
 
 A comprehensive sample showcasing how an AI agent orchestrates multiple downstream APIs using:
-- **Autonomous Agent Identities** for read operations (Order & CRM APIs)
-- **Agent User Identities** for write operations with user context (Shipping & Email APIs)
+- **Autonomous Agent Identities** (Order & CRM APIs)
+- **Agent User Identities** with user context (Shipping & Email APIs)
 - **.NET Aspire** for distributed tracing, logging, and service orchestration
 - **In-memory stores** for quick setup without external dependencies
 
@@ -24,8 +24,8 @@ A comprehensive sample showcasing how an AI agent orchestrates multiple downstre
 
 **Agent Identities** are a new capability in Microsoft Entra ID that enable AI agents to:
 
-1. **Autonomous Agent Identity** - Acquire app-only tokens for operations that don't require user context (e.g., reading data)
-2. **Agent User Identity** - Acquire tokens with user context for operations requiring user identity (e.g., writing data, sending emails)
+1. **Autonomous Agent Identity** - Acquire app-only tokens for operations that don't require user context.
+2. **Agent User Identity** - Acquire tokens with user context for operations requiring user identity (e.g., sending emails, participating in Teams channels)
 
 This allows developers to build AI agents that can securely call downstream APIs with the appropriate level of authorization.
 
@@ -43,7 +43,7 @@ This allows developers to build AI agents that can securely call downstream APIs
 - [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (for .NET samples)
 - Visual Studio 2022 or VS Code
 - *(Optional)* Azure subscription for cloud deployment
-- *(Optional)* Microsoft 365 Developer account for Graph API integration
+- *(Optional)* Microsoft 365 Developer account if you want to try Graph API integration with Teams/Mails
 
 ### Quick Start
 ```bash

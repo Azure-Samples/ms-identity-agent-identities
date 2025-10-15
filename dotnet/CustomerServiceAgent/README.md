@@ -2,15 +2,15 @@
 
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-purple)](https://dot.net)
 [![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
-[![Microsoft Identity Web](https://img.shields.io/badge/Identity.Web-3.10.0-green)](https://github.com/AzureAD/microsoft-identity-web)
+[![Microsoft Identity Web](https://img.shields.io/badge/Identity.Web-4.0.0-green)](https://github.com/AzureAD/microsoft-identity-web)
 
 A comprehensive sample demonstrating how AI agents securely call downstream services using **Agent Identities** in Microsoft Entra ID. This Customer Service Orchestration Agent showcases realistic business scenarios where an agent orchestrates multiple downstream APIs using both autonomous agent identities and agent user identities, all with full observability via .NET Aspire.
 
 ## 🎯 Overview
 
 This sample illustrates:
-- **Autonomous Agent Identities** - App-only tokens for read operations (Order & CRM APIs)
-- **Agent User Identities** - User context tokens for write operations (Shipping & Email APIs)  
+- **Autonomous Agent Identities** (Order & CRM APIs)
+- **Agent User Identities** with user context (Shipping & Email APIs)  
 - **.NET Aspire Dashboard** - Distributed tracing, logs, metrics, and service map
 - **Service Discovery** - Dynamic service resolution via Aspire
 - **In-Memory Stores** - Simple demonstration without external dependencies
@@ -106,6 +106,8 @@ graph TB
    # Open: src/AgentOrchestrator/AgentOrchestrator.http
    ```
 
+   Note that this endpoint is on purpose anonymous, so that you can more easily test things out. In production you would need to uncomment the [Authorize] attribute on the endpoint.
+
 ## 📁 Project Structure
 
 ```
@@ -180,21 +182,17 @@ All API calls are automatically traced and visible in the Aspire Dashboard.
 
 ## 🔧 Configuration
 
-### Development Mode (Mock Tokens)
-The sample includes a mock `IAuthorizationHeaderProvider` for development/demo purposes. This allows you to run and test the orchestration flow without configuring Azure AD.
-
 ### Production Mode (Azure AD)
 To enable real Agent Identities:
 
-1. **Register applications in Azure AD** (see [Entra ID Setup](docs/setup/02-entra-id-setup.md))
+1. **Register the downstream APIs in Azure AD** (see [Entra ID Setup](docs/setup/02-entra-id-setup.md))
 2. **Create Agent Identity Blueprint** in your tenant
 3. **Update appsettings.json** with your tenant and client IDs
-4. **Enable authentication** by uncommenting `[Authorize]` attributes in controllers
-5. **Configure Program.cs** to use real Microsoft Identity Web services
+4. **Configure Program.cs** to use real Microsoft Identity Web services
 
 ## 🧪 Testing Scenarios
 
-### Scenario 1: Read-Only Operations (Agent Identity)
+### Scenario 1: Agent Identity
 ```json
 POST /api/customerservice/process
 {

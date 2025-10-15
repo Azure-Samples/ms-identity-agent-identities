@@ -63,7 +63,6 @@ git --version
 **Required for:** Production deployment and real Azure AD configuration
 
 - **Get a free account:** https://azure.microsoft.com/free/
-- **Alternative:** Use mock authentication (default in sample)
 
 ### 2. Microsoft 365 Developer Account
 **Required for:** Microsoft Graph API integration (Teams, Outlook)

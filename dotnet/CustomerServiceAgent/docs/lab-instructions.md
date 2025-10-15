@@ -96,7 +96,7 @@ curl -X POST https://localhost:7000/api/customerservice/process \
 
 ### Step 6: Test Full Orchestration (Agent User Identity)
 
-**What's happening:** With a `userUpn` provided, the orchestrator also performs write operations using agent user identity tokens.
+**What's happening:** With a `userUpn` provided, the orchestrator also performs operations using agent user identity tokens.
 
 ```bash
 curl -X POST https://localhost:7000/api/customerservice/process \
@@ -147,13 +147,13 @@ Open `src/AgentOrchestrator/Services/OrchestrationService.cs`:
 public async Task<OrderDetails?> GetOrderDetailsAsync(string orderId)
 {
     // In production with Agent Identities:
+    // Agent Identity pattern:
     // var authHeader = await _authorizationHeaderProvider
     //     .CreateAuthorizationHeaderForAppAsync(
     //         $"api://YOUR_ORDER_SERVICE_CLIENT_ID/.default",
     //         new AuthorizationHeaderProviderOptions().WithAgentIdentity(autonomousAgentId)
     //     );
     
-    // Demo: Using mock token
     var authHeader = await _authorizationHeaderProvider
         .CreateAuthorizationHeaderForAppAsync(...);
     
