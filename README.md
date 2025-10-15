@@ -1,57 +1,108 @@
-# Project Name
+# Microsoft Identity - Agent Identities Samples
 
-(short, 1-3 sentenced, description of the project)
+This repository contains samples demonstrating how to use **Agent Identities** in Microsoft Entra ID with Microsoft Identity Web. Agent Identities enable AI agents to securely access downstream services using either autonomous (app-only) or user-delegated tokens.
 
-## Features
+## 📦 Samples
 
-This project framework provides the following features:
+### [.NET Customer Service Agent with Aspire](dotnet/CustomerServiceAgent/)
+[![.NET 9](https://img.shields.io/badge/.NET-9.0-purple)](https://dot.net)
+[![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
 
-* Feature 1
-* Feature 2
-* ...
+A comprehensive sample showcasing how an AI agent orchestrates multiple downstream APIs using:
+- **Autonomous Agent Identities** (Order & CRM APIs)
+- **Agent User Identities** with user context (Shipping & Email APIs)
+- **.NET Aspire** for distributed tracing, logging, and service orchestration
+- **In-memory stores** for quick setup without external dependencies
 
-## Getting Started
+**Perfect for:** Microsoft Ignite 2025 - 30-minute hands-on lab
+
+[View Sample →](dotnet/CustomerServiceAgent/)
+
+---
+
+## 🎯 What are Agent Identities?
+
+**Agent Identities** are a new capability in Microsoft Entra ID that enable AI agents to:
+
+1. **Autonomous Agent Identity** - Acquire app-only tokens for operations that don't require user context.
+2. **Agent User Identity** - Acquire tokens with user context for operations requiring user identity (e.g., sending emails, participating in Teams channels)
+
+This allows developers to build AI agents that can securely call downstream APIs with the appropriate level of authorization.
+
+### Key Benefits
+✅ **Secure by design** - Tokens are validated by Microsoft Entra ID  
+✅ **Flexible authorization** - Mix app-only and user-delegated patterns  
+✅ **Audit trail** - All operations are logged with proper identity context  
+✅ **Works with existing APIs** - No changes needed to downstream services  
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (for .NET samples)
+- Visual Studio 2022 or VS Code
+- *(Optional)* Azure subscription for cloud deployment
+- *(Optional)* Microsoft 365 Developer account if you want to try Graph API integration with Teams/Mails
 
-(ideally very short, if any)
+### Quick Start
+```bash
+# Clone the repository
+git clone https://github.com/Azure-Samples/ms-identity-agent-identities.git
 
-- OS
-- Library version
-- ...
+# Navigate to a sample
+cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
 
-### Installation
+# Build and run
+dotnet build
+dotnet run --project src/CustomerServiceAgent.AppHost
+```
 
-(ideally very short)
+---
 
-- npm install [package name]
-- mvn install
-- ...
+## 📚 Documentation
 
-### Quickstart
-(Add steps to get up and running quickly)
+- **[Agent Identities Official Documentation](https://github.com/AzureAD/microsoft-identity-web/blob/main/src/Microsoft.Identity.Web.AgentIdentities/README.AgentIdentities.md)** - Detailed guide on Agent Identities
+- **[Microsoft Identity Web](https://github.com/AzureAD/microsoft-identity-web)** - The library powering these samples
+- **[.NET Aspire](https://learn.microsoft.com/dotnet/aspire/)** - Cloud-native application orchestration
+- **[Microsoft Graph SDK](https://learn.microsoft.com/graph/sdks/sdks-overview)** - Integrate with Microsoft 365
 
-1. git clone [repository clone url]
-2. cd [repository name]
-3. ...
+---
 
+## 🤝 Contributing
 
-## Demo
+This project welcomes contributions and suggestions. Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
 
-A demo app is included to show how to use the project.
+When you submit a pull request, a CLA bot will automatically determine whether you need to provide a CLA and decorate the PR appropriately. Simply follow the instructions provided by the bot.
 
-To run the demo, follow these steps:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
 
-(Add steps to start up the demo)
+---
 
-1.
-2.
-3.
+## ⚖️ License
 
-## Resources
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
 
-(Any additional resources or related projects)
+---
 
-- Link to supporting information
-- Link to similar sample
-- ...
+## 📧 Support
+
+For questions or issues:
+- **GitHub Issues** - [Create an issue](https://github.com/Azure-Samples/ms-identity-agent-identities/issues)
+- **Microsoft Q&A** - [Ask on Microsoft Q&A](https://learn.microsoft.com/answers/tags/455/entra-id)
+- **Stack Overflow** - Tag your question with `azure-ad` and `microsoft-identity-web`
+
+---
+
+## 🌟 Additional Resources
+
+- [Microsoft Entra ID Documentation](https://learn.microsoft.com/entra/identity/)
+- [Azure Identity Samples](https://github.com/Azure-Samples?q=identity)
+- [Microsoft Identity Platform](https://learn.microsoft.com/entra/identity-platform/)
+- [Office 365 Developer Program](https://developer.microsoft.com/microsoft-365/dev-program)
+
+---
+
+**Target:** Microsoft Ignite 2025 (November)  
+**Maintained by:** Microsoft Identity Team
+

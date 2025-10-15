@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Graph" Version="5.70.0" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="4.0.0" />
+    <PackageReference Include="Microsoft.Identity.Web.AgentIdentities" Version="4.0.0" />
+    <PackageReference Include="Microsoft.Identity.Web.GraphServiceClient" Version="4.0.0" />
+    <PackageReference Include="Microsoft.Identity.Web.TokenCache" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\CustomerServiceAgent.ServiceDefaults\CustomerServiceAgent.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>
