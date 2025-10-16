@@ -234,6 +234,17 @@ This table maps script operations to manual setup steps in [02-entra-id-setup.md
 
 ## Troubleshooting
 
+### Error InteractiveBrowserCredential authentication failed
+Connect-MgGraph: InteractiveBrowserCredential authentication failed: An HttpListenerException occurred while listening on http://localhost:62850/ for the system browser to complete the login. Possible cause and mitigation: the app is unable to listen on the specified URL; run 'netsh http add iplisten 127.0.0.1' from the Admin command prompt.
+
+***Solution***: run Connect-MgGraph with the -UseDeviceCode option
+
+```powershell
+Connect-MgGraph -UseDeviceCode
+```
+
+and follow the instructions (use a web browser to open the page https://microsoft.com/devicelogin and enter the code provided for authentication).
+
 ### Error: "Connect-MgGraph: Insufficient privileges"
 
 **Cause**: Your account doesn't have permission to create applications.

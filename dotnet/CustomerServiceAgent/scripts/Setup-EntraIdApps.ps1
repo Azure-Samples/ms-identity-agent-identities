@@ -201,9 +201,9 @@ function Get-OrCreateApplication {
     
     try {
         # Check if app already exists
-        $existingApps = Get-MgApplication -Filter "displayName eq '$DisplayName'" -ErrorAction SilentlyContinue
+        $existingApps = @(Get-MgApplication -Filter "displayName eq '$DisplayName'" -ErrorAction SilentlyContinue)
         
-        if ($existingApps -and $existingApps.Count -gt 0) {
+        if ($existingApps.Count -gt 0) {
             $app = $existingApps[0]
             Write-Status "Found existing app: $DisplayName (ClientId: $($app.AppId))" -Type Success
             return $app
