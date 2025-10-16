@@ -4,6 +4,20 @@ This guide walks you through configuring Microsoft Entra ID (formerly Azure AD) 
 
 > **Note:** This is optional. The sample works in demo mode with mock tokens. Follow this guide only if you want production-ready authentication.
 
+## 🚀 Quick Start: Automated Setup
+
+**NEW!** Use our PowerShell automation script to complete steps 1-5 automatically:
+
+```powershell
+cd scripts
+.\Setup-EntraIdApps.ps1 -OutputFormat UpdateConfig
+```
+
+This idempotent script creates all required app registrations, permissions, and configuration in ~25 minutes.  
+📖 See [scripts/README.md](../../scripts/README.md) for detailed usage instructions.
+
+> **Tip:** If you prefer manual setup or want to understand each step, continue with the instructions below.
+
 ---
 
 ## Overview
@@ -15,7 +29,7 @@ To enable Agent Identities, you need to:
 4. Create autonomous and agent user identities
 5. Update appsettings.json files
 
-**Time Required:** ~45 minutes  
+**Time Required:** ~45 minutes (manual) or ~25 minutes (automated)  
 **Prerequisites:** Azure subscription with Global Administrator role
 
 ---
