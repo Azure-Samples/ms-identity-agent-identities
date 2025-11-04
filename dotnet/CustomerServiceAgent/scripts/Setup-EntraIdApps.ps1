@@ -375,11 +375,11 @@ function Set-InheritablePermissions {
                 Start-Sleep -Seconds 2
             }
             
-            # Add /.default scope permission (this is for inheritable permissions)
-            # For Agent Identity Blueprints, we use application permissions with .default scope
+            # Add individual scope permissions (inheritable permissions for Agent Identity Blueprint)
+            # These permissions will be inherited by agent identities created from the blueprint
             $resourceAccess = @()
             
-            # Get the first scope ID (we'll use .default which encompasses all scopes)
+            # Add each scope defined for the service as delegated permissions
             if ($serviceApp.Api.Oauth2PermissionScopes -and $serviceApp.Api.Oauth2PermissionScopes.Count -gt 0) {
                 foreach ($scope in $serviceApp.Api.Oauth2PermissionScopes) {
                     $resourceAccess += @{
@@ -1097,6 +1097,7 @@ function Update-ConfigFiles {
     foreach ($serviceName in $script:Results.Services.Keys) {
         $service = $script:Results.Services[$serviceName]
         $serviceFolder = $serviceName -replace 'API', 'Service'
+        # Build path to service-specific appsettings.json
         $serviceConfigPath = Join-Path $projectRoot "src\DownstreamServices\$serviceFolder\appsettings.json"
         
         if (Test-Path $serviceConfigPath) {
