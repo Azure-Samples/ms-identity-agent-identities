@@ -4,12 +4,14 @@ This directory contains PowerShell automation scripts to simplify the setup of M
 
 ## Overview
 
-The `Setup-EntraIdApps.ps1` script automates the manual steps described in [02-entra-id-setup.md](../docs/setup/02-entra-id-setup.md), creating all required Entra ID app registrations, API permissions, and scopes in a single run.
+The `Setup-EntraIdApps.ps1` script automates the manual steps described in [02-entra-id-setup.md](../docs/setup/02-entra-id-setup.md), creating an **Agent Identity Blueprint**, downstream API app registrations, inheritable permissions, and agent identities in a single run.
 
 ### Key Features
 
 - ✅ **Idempotent**: Safe to run multiple times without creating duplicates
-- ✅ **Automated**: Creates all 5 app registrations and configures permissions
+- ✅ **Agent Identity Blueprint**: Creates orchestrator as an Agent Identity Blueprint with inheritable permissions
+- ✅ **Multiple Instances**: Support for configurable prefix to create multiple isolated instances
+- ✅ **Automated**: Creates all app registrations and configures permissions automatically
 - ✅ **Flexible Output**: Supports multiple output formats (PowerShell, JSON, environment variables, or direct config update)
 - ✅ **Error Handling**: Graceful error handling with actionable messages
 - ✅ **Interactive & Non-Interactive**: Works with Graph PowerShell sign-in or tenant ID parameter
@@ -83,6 +85,20 @@ If your tenant doesn't have the Agent Identities preview feature:
 .\Setup-EntraIdApps.ps1 -SkipAgentIdentities
 ```
 
+### Create Multiple Instances
+
+To create multiple isolated instances with different prefixes:
+
+```powershell
+# Create demo instance
+.\Setup-EntraIdApps.ps1 -SampleInstancePrefix "Demo-"
+
+# Create test instance
+.\Setup-EntraIdApps.ps1 -SampleInstancePrefix "Test-"
+```
+
+This creates apps like "Demo-Orchestrator", "Demo-OrderAPI", etc.
+
 ## Usage Examples
 
 ### Example 1: Basic Setup with PowerShell Output
@@ -94,10 +110,9 @@ If your tenant doesn't have the Agent Identities preview feature:
 **Output:**
 ```powershell
 $TenantId = "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
-$OrchestratorClientId = "11111111-2222-3333-4444-555555555555"
-$OrchestratorClientSecret = "abc123..."
+$BlueprintClientId = "11111111-2222-3333-4444-555555555555"
+$BlueprintClientSecret = "abc123..."
 $OrderClientId = "22222222-3333-4444-5555-666666666666"
-$CrmClientId = "33333333-4444-5555-6666-777777777777"
 $ShippingClientId = "44444444-5555-6666-7777-888888888888"
 $EmailClientId = "55555555-6666-7777-8888-999999999999"
 ```
@@ -112,15 +127,26 @@ $EmailClientId = "55555555-6666-7777-8888-999999999999"
 ```json
 {
   "TenantId": "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6",
-  "Orchestrator": {
+  "SampleInstancePrefix": "CustomerService-",
+  "Blueprint": {
     "ClientId": "11111111-2222-3333-4444-555555555555",
-    "ClientSecret": "abc123..."
+    "ClientSecret": "abc123...",
+    "BlueprintId": "MANUAL_SETUP_REQUIRED"
   },
   "Services": {
     "OrderAPI": {
-      "ClientId": "22222222-3333-4444-5555-666666666666"
+      "ClientId": "22222222-3333-4444-5555-666666666666",
+      "Scopes": ["api://22222222-3333-4444-5555-666666666666/.default"]
     },
     ...
+  },
+  "AutonomousAgent": {
+    "Id": "MANUAL_SETUP_REQUIRED",
+    "Name": "CustomerService-AutonomousAgent"
+  },
+  "AgentUser": {
+    "Id": "MANUAL_SETUP_REQUIRED",
+    "Name": "CustomerService-AgentUser"
   }
 }
 ```
@@ -134,10 +160,9 @@ $EmailClientId = "55555555-6666-7777-8888-999999999999"
 **Output:**
 ```powershell
 $env:TENANT_ID = "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
-$env:ORCHESTRATOR_CLIENT_ID = "11111111-2222-3333-4444-555555555555"
-$env:ORCHESTRATOR_CLIENT_SECRET = "abc123..."
+$env:BLUEPRINT_CLIENT_ID = "11111111-2222-3333-4444-555555555555"
+$env:BLUEPRINT_CLIENT_SECRET = "abc123..."
 $env:ORDER_CLIENT_ID = "22222222-3333-4444-5555-666666666666"
-$env:CRM_CLIENT_ID = "33333333-4444-5555-6666-777777777777"
 $env:SHIPPING_CLIENT_ID = "44444444-5555-6666-7777-888888888888"
 $env:EMAIL_CLIENT_ID = "55555555-6666-7777-8888-999999999999"
 ```
@@ -155,6 +180,7 @@ This will update all `appsettings.json` files automatically with the generated v
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `TenantId` | String | No | Current tenant | The Azure AD tenant ID to use |
+| `SampleInstancePrefix` | String | No | `CustomerService-` | Prefix for all app registrations (enables multiple instances) |
 | `OutputFormat` | String | No | `PowerShell` | Output format: `PowerShell`, `Json`, `EnvVars`, or `UpdateConfig` |
 | `SkipAgentIdentities` | Switch | No | False | Skip Agent Identity creation |
 | `ServiceAccountUpn` | String | No | None | UPN for agent user service account |
@@ -168,35 +194,56 @@ The script performs the following operations in order:
 - Validates tenant access
 - Requests required permissions
 
-### 2. Create Applications (10 minutes)
+### 2. Create Agent Identity Blueprint Application (5 minutes)
+Creates the orchestrator application that will serve as the Agent Identity Blueprint:
+- ✅ `CustomerService-Orchestrator` (or custom prefix)
+- ✅ Adds client secret to the blueprint application
+
+### 3. Create Downstream Service Applications (10 minutes)
 Creates the following app registrations:
-- ✅ `CustomerService-Orchestrator` (with client secret)
-- ✅ `CustomerService-OrderAPI`
-- ✅ `CustomerService-CrmAPI`
+- ✅ `CustomerService-OrderAPI` (or custom prefix)
 - ✅ `CustomerService-ShippingAPI`
 - ✅ `CustomerService-EmailAPI`
 
-### 3. Configure API Scopes (5 minutes)
+### 4. Configure API Scopes (5 minutes)
 For each service, configures:
 - Application ID URI (e.g., `api://[client-id]`)
 - OAuth2 permission scopes:
   - **OrderAPI**: `Orders.Read`
-  - **CrmAPI**: `CRM.Read`
   - **ShippingAPI**: `Shipping.Read`, `Shipping.Write`
   - **EmailAPI**: `Email.Send`
 
-### 4. Grant API Permissions (5 minutes)
-- Configures the orchestrator app with permissions to call all downstream APIs
-- Uses delegated (Scope) permissions for authentication flow
+### 5. Configure Inheritable Permissions (5 minutes)
+- Sets up inheritable permissions on the blueprint application for downstream APIs
+- These permissions are automatically inherited by agent identities created from the blueprint
+- Permissions include:
+  - `api://{ORDER_CLIENT_ID}/.default`
+  - `api://{SHIPPING_CLIENT_ID}/.default`
+  - `api://{EMAIL_CLIENT_ID}/.default`
 
-### 5. Grant Admin Consent (2 minutes)
-- Automatically grants tenant-wide admin consent for all permissions
-- Creates necessary service principals
+### 6. Create Service Principal for Blueprint (2 minutes)
+- Creates service principal for the blueprint application
+- Required for admin consent and agent identity operations
 
-### 6. Output Configuration (1 minute)
+### 7. Grant Admin Consent (2 minutes)
+- Automatically grants tenant-wide admin consent for all inheritable permissions
+- Creates necessary service principals for downstream APIs
+
+### 8. Setup Agent Identity Blueprint (Manual)
+- Provides guidance for creating the Agent Identity Blueprint in Azure Portal
+- Links blueprint to the orchestrator application
+- **Note**: Agent Identity Blueprint API is in preview and requires manual setup
+
+### 9. Create Agent Identities (Manual)
+- **Autonomous Agent Identity**: For calling OrderService without user context
+- **Agent User Identity**: For calling ShippingService and EmailService with user context
+- Provides step-by-step guidance for manual creation in Azure Portal
+
+### 10. Output Configuration (1 minute)
 - Displays or writes configuration values in the selected format
+- Includes placeholders for manually created agent identities
 
-**Total Time: ~25 minutes**
+**Total Time: ~25 minutes (automated) + 10-15 minutes (manual blueprint/identity setup)**
 
 ## Idempotency
 
@@ -214,6 +261,7 @@ You should re-run the script if:
 - ✅ You need to regenerate a client secret
 - ✅ You want to verify configuration
 - ✅ You need to update permissions
+- ✅ You want to create a new instance with a different prefix
 
 ## Mapping to Manual Setup
 
@@ -221,16 +269,18 @@ This table maps script operations to manual setup steps in [02-entra-id-setup.md
 
 | Manual Step | Script Operation | Function |
 |-------------|------------------|----------|
-| Step 1: Register Orchestrator | Automated | `Get-OrCreateApplication` |
+| Step 1: Register Blueprint App | Automated | `Get-OrCreateApplication` |
 | Step 2: Create Client Secret | Automated | `New-ApplicationSecret` |
 | Step 3: Register Services | Automated | `Get-OrCreateApplication` |
 | Step 4: Expose APIs | Automated | `Set-ApiScopes` |
-| Step 5: Grant Permissions | Automated | `Grant-ApiPermissions` |
-| Step 5: Admin Consent | Automated | `Grant-AdminConsent` |
-| Step 6-8: Agent Identities | Manual* | See notes below |
-| Step 9-10: Update Config | Automated with `-UpdateConfig` | `Update-ConfigFiles` |
+| Step 5: Configure Inheritable Permissions | Automated | `Set-InheritablePermissions` |
+| Step 6: Create Service Principal | Automated | `New-MgServicePrincipal` |
+| Step 7: Admin Consent | Automated | `Grant-AdminConsent` |
+| Step 8: Create Blueprint | Manual* | `Get-OrCreateAgentIdentityBlueprint` (guidance only) |
+| Step 9: Create Agent Identities | Manual* | `New-AgentIdentity` (guidance only) |
+| Step 10: Update Config | Automated with `-UpdateConfig` | `Update-ConfigFiles` |
 
-\* Agent Identities are in preview and the API may not be available via Microsoft.Graph PowerShell yet. Create these manually via Azure Portal.
+\* Agent Identity Blueprint and Identities are in preview and the API may not be available via Microsoft.Graph PowerShell yet. The script provides detailed guidance for manual creation via Azure Portal.
 
 ## Troubleshooting
 
