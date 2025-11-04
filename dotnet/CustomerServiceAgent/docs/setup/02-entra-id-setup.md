@@ -63,7 +63,6 @@ Repeat for each downstream service:
 | Service | App Name |
 |---------|----------|
 | Order Service | `CustomerService-OrderAPI` |
-| CRM Service | `CustomerService-CrmAPI` |
 | Shipping Service | `CustomerService-ShippingAPI` |
 | Email Service | `CustomerService-EmailAPI` |
 
@@ -76,7 +75,7 @@ For each:
 
 ### Step 4: Expose APIs
 
-For **each downstream service** (Order, CRM, Shipping, Email):
+For **each downstream service** (Order, Shipping, Email):
 
 1. Go to the app registration
 2. Select **Expose an API**
@@ -86,7 +85,6 @@ For **each downstream service** (Order, CRM, Shipping, Email):
 6. Create scope:
    - **Scope name:** Based on service:
      - OrderService: `Orders.Read`
-     - CrmService: `CRM.Read`
      - ShippingService: `Shipping.Read`, `Shipping.Write`
      - EmailService: `Email.Send`
    - **Who can consent:** Admins only
@@ -122,7 +120,6 @@ Description: Allows the application to read order information
 
 **Result:** Orchestrator should have permissions to:
 - `api://customerservice-orders/Orders.Read`
-- `api://customerservice-crm/CRM.Read`
 - `api://customerservice-shipping/Shipping.Read`
 - `api://customerservice-shipping/Shipping.Write`
 - `api://customerservice-email/Email.Send`
@@ -187,7 +184,6 @@ Edit `src/AgentOrchestrator/appsettings.json`:
   },
   "Services": {
     "OrderService": "https://localhost:7001",
-    "CrmService": "https://localhost:7002",
     "ShippingService": "https://localhost:7003",
     "EmailService": "https://localhost:7004"
   }
@@ -196,7 +192,7 @@ Edit `src/AgentOrchestrator/appsettings.json`:
 
 ### Step 10: Update Downstream Service appsettings.json
 
-For **each service** (Order, CRM, Shipping, Email):
+For **each service** (Order, Shipping, Email):
 
 Edit `src/DownstreamServices/[ServiceName]/appsettings.json`:
 

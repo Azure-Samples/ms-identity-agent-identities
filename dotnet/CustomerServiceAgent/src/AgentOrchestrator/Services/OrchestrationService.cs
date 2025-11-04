@@ -64,40 +64,6 @@ public class OrchestrationService
     }
 
     /// <summary>
-    /// Get customer history using agent identity (read operation)
-    /// </summary>
-    public async Task<CustomerHistory?> GetCustomerHistoryAsync(string customerId, string? agentIdentity = null)
-    {
-        var crmServiceConfig = _configuration.GetSection("DownstreamApis:CrmService");
-        var crmServiceUrl = crmServiceConfig["BaseUrl"] 
-            ?? throw new InvalidOperationException("CrmService URL not configured");
-        var scopes = crmServiceConfig["Scopes"]
-            ?? throw new InvalidOperationException("CrmService scopes not configured");
-
-        var agentId = agentIdentity ?? _configuration["AgentIdentities:AgentIdentity"];
-        _logger.LogInformation("Acquiring token for CRM Service using agent identity {AgentId}", agentId);
-
-        // Acquire token using agent identity
-        // With Agent Identities: use new AuthorizationHeaderProviderOptions().WithAgentIdentity(agentId)
-        var authHeader = await _authorizationHeaderProvider.CreateAuthorizationHeaderForAppAsync(scopes);
-
-        var httpClient = _httpClientFactory.CreateClient();
-        httpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);
-
-        _logger.LogInformation("Calling CRM Service GET /api/customers/{CustomerId}", customerId);
-        var response = await httpClient.GetAsync($"{crmServiceUrl}/api/customers/{customerId}");
-
-        if (response.IsSuccessStatusCode)
-        {
-            _logger.LogInformation("Successfully retrieved customer {CustomerId}", customerId);
-            return await response.Content.ReadFromJsonAsync<CustomerHistory>();
-        }
-
-        _logger.LogWarning("Failed to retrieve customer {CustomerId}: {StatusCode}", customerId, response.StatusCode);
-        return null;
-    }
-
-    /// <summary>
     /// Update delivery info using agent user identity (write operation with user context)
     /// </summary>
     public async Task<DeliveryInfo?> UpdateDeliveryAsync(string orderId, DeliveryInfo updatedInfo, string userUpn, string? agentIdentity = null)

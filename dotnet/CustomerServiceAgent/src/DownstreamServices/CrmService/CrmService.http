@@ -1,6 +1,0 @@
-@CrmService_HostAddress = http://localhost:5034
-
-GET {{CrmService_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

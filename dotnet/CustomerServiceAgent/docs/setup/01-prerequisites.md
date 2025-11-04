@@ -95,7 +95,6 @@ The sample uses the following local ports by default:
 - **15888** - Aspire Dashboard (HTTPS)
 - **7000** - Agent Orchestrator (HTTPS)
 - **7001** - Order Service (HTTPS)
-- **7002** - CRM Service (HTTPS)
 - **7003** - Shipping Service (HTTPS)
 - **7004** - Email Service (HTTPS)
 

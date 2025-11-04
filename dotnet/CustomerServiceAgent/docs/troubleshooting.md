@@ -146,7 +146,6 @@ Verify `src/AgentOrchestrator/appsettings.json` has service URLs:
 {
   "Services": {
     "OrderService": "https://localhost:7001",
-    "CrmService": "https://localhost:7002",
     "ShippingService": "https://localhost:7003",
     "EmailService": "https://localhost:7004"
   }
@@ -333,10 +332,10 @@ dotnet clean
 dotnet build --verbosity detailed
 
 # Check listening ports (Windows)
-netstat -ano | findstr "7000 7001 7002 7003 7004 15888"
+netstat -ano | findstr "7000 7001 7003 7004 15888"
 
 # Check listening ports (Linux/Mac)
-lsof -i :7000 -i :7001 -i :7002 -i :7003 -i :7004 -i :15888
+lsof -i :7000 -i :7001 -i :7003 -i :7004 -i :15888
 ```
 
 ---

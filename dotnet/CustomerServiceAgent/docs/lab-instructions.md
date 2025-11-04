@@ -49,7 +49,7 @@ Aspire Dashboard is running
 ### Step 3: Open the Aspire Dashboard
 1. Open your browser to `https://localhost:15888`
 2. Explore the Dashboard:
-   - **Resources** tab: See all 5 services running
+   - **Resources** tab: See all 4 services running (Orchestrator, Order, Shipping, Email)
    - **Console** tab: View aggregated logs
    - **Traces** tab: Distributed tracing (we'll use this soon)
 
@@ -59,7 +59,7 @@ Aspire Dashboard is running
 
 ### Step 4: Test Read-Only Operations (Autonomous Agent Identity)
 
-**What's happening:** The orchestrator acquires an autonomous agent identity token to call Order and CRM services (read operations).
+**What's happening:** The orchestrator acquires an autonomous agent identity token to call the Order service (read operations).
 
 Open a new terminal and execute:
 ```bash
@@ -74,11 +74,10 @@ curl -X POST https://localhost:7000/api/customerservice/process \
   "orderId": "12345",
   "status": "Completed",
   "orderDetails": { ... },
-  "customerHistory": { ... },
   "messages": [
-    "Fetching order details using autonomous agent identity...",
+    "Fetching order details using agent identity...",
     "Order 12345 retrieved successfully",
-    ...
+    "User UPN not provided - skipping write operations (delivery update and email)"
   ]
 }
 ```
@@ -89,7 +88,6 @@ curl -X POST https://localhost:7000/api/customerservice/process \
 3. Expand the spans to see:
    - Token acquisition (MOCK in dev mode)
    - HTTP calls to OrderService
-   - HTTP calls to CrmService
    - Response times for each operation
 
 **💡 Key Insight:** Notice how the trace shows the entire request flow across all services.
@@ -215,7 +213,6 @@ Open `src/DownstreamServices/OrderService/Controllers/OrdersController.cs`:
 2. Select "View Details" for `agentorchestrator`
 3. Observe the service dependencies:
    - `agentorchestrator` → `orderservice`
-   - `agentorchestrator` → `crmservice`
    - `agentorchestrator` → `shippingservice`
    - `agentorchestrator` → `emailservice`
 
