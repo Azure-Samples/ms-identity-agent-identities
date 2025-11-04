@@ -58,25 +58,10 @@ public class CustomerServiceController : ControllerBase
 
             result.Messages.Add($"Order {request.OrderId} retrieved successfully");
 
-            // Step 2: Get customer history using agent identity (read operation)
-            _logger.LogInformation("Step 2: Fetching customer history using agent identity");
-            result.Messages.Add("Fetching customer history using agent identity...");
-            
-            result.CustomerHistory = await _orchestrationService.GetCustomerHistoryAsync(result.OrderDetails.CustomerId, request.AgentIdentity);
-            
-            if (result.CustomerHistory != null)
-            {
-                result.Messages.Add($"Customer {result.OrderDetails.CustomerId} history retrieved successfully");
-            }
-            else
-            {
-                result.Messages.Add($"Customer history not found (non-critical)");
-            }
-
-            // Step 3: Update delivery info using agent user identity (write operation - requires user context)
+            // Step 2: Update delivery info using agent user identity (write operation - requires user context)
             if (!string.IsNullOrEmpty(request.UserUpn))
             {
-                _logger.LogInformation("Step 3: Updating delivery info using agent user identity");
+                _logger.LogInformation("Step 2: Updating delivery info using agent user identity");
                 result.Messages.Add("Updating delivery info using agent user identity...");
 
                 var updatedDelivery = new DeliveryInfo
@@ -100,13 +85,13 @@ public class CustomerServiceController : ControllerBase
                     result.Messages.Add("Delivery info updated successfully");
                 }
 
-                // Step 4: Send email notification using agent user identity
-                _logger.LogInformation("Step 4: Sending email notification using agent user identity");
+                // Step 3: Send email notification using agent user identity
+                _logger.LogInformation("Step 3: Sending email notification using agent user identity");
                 result.Messages.Add("Sending email notification using agent user identity...");
 
                 var emailRequest = new EmailRequest
                 {
-                    To = result.CustomerHistory?.Email ?? "customer@example.com",
+                    To = "customer@example.com",
                     Subject = $"Order {request.OrderId} Status Update",
                     Body = $"Your order {request.OrderId} has been updated. Status: {result.OrderDetails.Status}",
                     From = "customerservice@example.com"

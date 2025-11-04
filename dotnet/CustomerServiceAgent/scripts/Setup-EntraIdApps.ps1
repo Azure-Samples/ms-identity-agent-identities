@@ -85,13 +85,6 @@ $script:Config = @{
             )
         },
         @{
-            Name = "CrmAPI"
-            DisplayName = "CustomerService-CrmAPI"
-            Scopes = @(
-                @{ Name = "CRM.Read"; DisplayName = "Read CRM data"; Description = "Allows the application to read customer information" }
-            )
-        },
-        @{
             Name = "ShippingAPI"
             DisplayName = "CustomerService-ShippingAPI"
             Scopes = @(
