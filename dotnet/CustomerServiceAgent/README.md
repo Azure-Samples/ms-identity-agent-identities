@@ -9,8 +9,8 @@ A comprehensive sample demonstrating how AI agents securely call downstream serv
 ## 🎯 Overview
 
 This sample illustrates:
-- **Autonomous Agent Identities** (Order & CRM APIs)
-- **Agent User Identities** with user context (Shipping & Email APIs)  
+- **Autonomous Agent Identity** (Order API - read operations)
+- **Agent User Identities** with user context (Shipping & Email APIs - write operations)  
 - **.NET Aspire Dashboard** - Distributed tracing, logs, metrics, and service map
 - **Service Discovery** - Dynamic service resolution via Aspire
 - **In-Memory Stores** - Simple demonstration without external dependencies
@@ -27,7 +27,6 @@ graph TB
     subgraph "Application Services"
         Orchestrator[Agent Orchestrator API<br/>CustomerServiceController]
         OrderAPI[Order Service API<br/>In-memory order store]
-        CrmAPI[CRM Service API<br/>In-memory customer history]
         ShippingAPI[Shipping Service API<br/>In-memory delivery management]
         EmailAPI[Email Service API<br/>Mock email sender]
     end
@@ -38,24 +37,20 @@ graph TB
     
     AppHost -->|Configures & Starts| Orchestrator
     AppHost -->|Configures & Starts| OrderAPI
-    AppHost -->|Configures & Starts| CrmAPI
     AppHost -->|Configures & Starts| ShippingAPI
     AppHost -->|Configures & Starts| EmailAPI
     
     Dashboard -.->|Observes Telemetry| Orchestrator
     Dashboard -.->|Observes Telemetry| OrderAPI
-    Dashboard -.->|Observes Telemetry| CrmAPI
     Dashboard -.->|Observes Telemetry| ShippingAPI
     Dashboard -.->|Observes Telemetry| EmailAPI
     
     Orchestrator -->|Service Discovery| OrderAPI
-    Orchestrator -->|Service Discovery| CrmAPI
     Orchestrator -->|Service Discovery| ShippingAPI
     Orchestrator -->|Service Discovery| EmailAPI
     
     Orchestrator -->|Acquire Token| EntraID
     OrderAPI -->|Validate Token| EntraID
-    CrmAPI -->|Validate Token| EntraID
     ShippingAPI -->|Validate Token| EntraID
     EmailAPI -->|Validate Token| EntraID
     
@@ -134,7 +129,6 @@ CustomerServiceAgent/
     │   └── appsettings.json
     ├── DownstreamServices/
     │   ├── OrderService/                  # Read operations (autonomous)
-    │   ├── CrmService/                    # Read operations (autonomous)
     │   ├── ShippingService/               # Write operations (agent user)
     │   └── EmailService/                  # Write operations (agent user)
     └── Shared/
@@ -145,7 +139,7 @@ CustomerServiceAgent/
 
 ### 1. Autonomous Agent Identity (Read Operations)
 ```csharp
-// OrderService and CRM Service use autonomous agent identity
+// OrderService uses autonomous agent identity
 var authHeader = await _authorizationHeaderProvider
     .CreateAuthorizationHeaderForAppAsync(
         $"api://YOUR_SERVICE_CLIENT_ID/.default",
@@ -200,7 +194,7 @@ POST /api/customerservice/process
   "agentIdentity": "YOUR_AGENT_IDENTITY_ID"
 }
 ```
-**Expected:** Orders and customer history retrieved using agent identity.
+**Expected:** Order retrieved using agent identity.
 
 ### Scenario 2: Full Orchestration (Agent User Identity)
 ```json

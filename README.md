@@ -9,8 +9,8 @@ This repository contains samples demonstrating how to use **Agent Identities** i
 [![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
 
 A comprehensive sample showcasing how an AI agent orchestrates multiple downstream APIs using:
-- **Autonomous Agent Identities** (Order & CRM APIs)
-- **Agent User Identities** with user context (Shipping & Email APIs)
+- **Autonomous Agent Identity** (Order API - read operations)
+- **Agent User Identities** with user context (Shipping & Email APIs - write operations)
 - **.NET Aspire** for distributed tracing, logging, and service orchestration
 - **In-memory stores** for quick setup without external dependencies
 
