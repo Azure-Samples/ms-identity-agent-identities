@@ -53,6 +53,9 @@ git clone https://github.com/Azure-Samples/ms-identity-agent-identities.git
 # Navigate to a sample
 cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
 
+# Install .NET aspire if needed
+dotnet workload install aspire
+
 # Build and run
 dotnet build
 dotnet run --project src/CustomerServiceAgent.AppHost
