@@ -565,60 +565,124 @@ function Grant-AdminConsent {
     }
 }
 
-function Get-OrCreateAgentIdentityBlueprint {
+function New-AgentIdentityBlueprintApp {
     param(
         [Parameter(Mandatory=$true)]
-        [string]$BlueprintName,
-        
-        [Parameter(Mandatory=$true)]
-        [string]$BlueprintAppClientId,
+        [string]$DisplayName,
         
         [Parameter(Mandatory=$false)]
-        [array]$DownstreamServices
+        [string]$CurrentUserId
     )
     
-    Write-Status "Working with Agent Identity Blueprint: $BlueprintName" -Type Info
-    Write-Status "Agent Identity Blueprints are in preview - checking availability..." -Type Warning
+    Write-Status "Creating Agent Identity Blueprint application: $DisplayName" -Type Info
     
     try {
-        # Note: Agent Identity Blueprints API is currently in preview
-        # The Microsoft.Graph PowerShell module may not have full support yet
-        # This function provides guidance for manual setup
+        # Check if blueprint already exists
+        $existingBlueprints = @(Get-MgApplication -Filter "displayName eq '$DisplayName'" -ErrorAction SilentlyContinue)
         
-        Write-Host "`n--- Agent Identity Blueprint Setup Required ---`n" -ForegroundColor Yellow
-        Write-Status "The Agent Identity Blueprint feature is in preview and requires manual setup via Azure Portal." -Type Info
-        Write-Status "Follow these steps:" -Type Info
-        Write-Status "" -Type Info
-        Write-Status "1. Navigate to Azure Portal > Microsoft Entra ID > Identity Governance" -Type Info
-        Write-Status "2. Select 'Agent Identity Blueprints' (if available in your tenant)" -Type Info
-        Write-Status "3. Click 'New blueprint'" -Type Info
-        Write-Status "4. Name: $BlueprintName" -Type Info
-        Write-Status "5. Link to application: $BlueprintAppClientId" -Type Info
-        Write-Status "" -Type Info
-        Write-Status "The blueprint should inherit these API permissions:" -Type Info
-        foreach ($service in $DownstreamServices) {
-            Write-Status "   - api://$($service.ClientId)/.default ($($service.DisplayName))" -Type Info
+        if ($existingBlueprints.Count -gt 0) {
+            $blueprint = $existingBlueprints[0]
+            Write-Status "Found existing blueprint application: $DisplayName (AppId: $($blueprint.AppId))" -Type Success
+            return $blueprint
         }
-        Write-Status "" -Type Info
         
-        # Return a placeholder structure
-        return @{
-            Id = "MANUAL_SETUP_REQUIRED"
-            Name = $BlueprintName
-            ApplicationId = $BlueprintAppClientId
-            ManualSetupRequired = $true
+        # Get current user ID if not provided
+        if (-not $CurrentUserId) {
+            try {
+                $currentUser = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/me" -ErrorAction SilentlyContinue
+                $CurrentUserId = $currentUser.id
+                Write-Status "Using current user as owner: $($currentUser.userPrincipalName)" -Type Info
+            }
+            catch {
+                Write-Status "Could not retrieve current user ID. Blueprint will be created without owner." -Type Warning
+            }
         }
+        
+        # Build the request body for Agent Identity Blueprint
+        $Body = @{
+            displayName = $DisplayName
+        }
+        
+        # Add owner if available
+        if ($CurrentUserId) {
+            $Body["owners@odata.bind"] = @("https://graph.microsoft.com/v1.0/users/$CurrentUserId")
+        }
+        
+        $JsonBody = $Body | ConvertTo-Json -Depth 5
+        Write-Status "Creating Agent Identity Blueprint using beta endpoint..." -Type Info
+        
+        # Use the specialized Agent Identity Blueprint endpoint
+        $BlueprintRes = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/applications/graph.agentIdentityBlueprint" -Body $JsonBody
+        
+        Write-Status "Successfully created Agent Identity Blueprint" -Type Success
+        Write-Status "Blueprint Application ID: $($BlueprintRes.id)" -Type Info
+        Write-Status "Blueprint App ID (Client ID): $($BlueprintRes.appId)" -Type Info
+        
+        # Wait for replication
+        Start-Sleep -Seconds 3
+        
+        return $BlueprintRes
     }
     catch {
-        Write-Status "Note: Agent Identity Blueprint setup requires manual configuration" -Type Warning
-        return $null
+        Write-Status "Error creating Agent Identity Blueprint: $($_.Exception.Message)" -Type Error
+        # Check if it's a permissions error
+        if ($_.Exception.Message -like "*Insufficient privileges*" -or $_.Exception.Message -like "*Unauthorized*") {
+            Write-Status "This may indicate that your tenant doesn't have Agent Identity Blueprints enabled or you lack required permissions." -Type Warning
+            Write-Status "Required permission: AgentIdentityBlueprint.Create" -Type Warning
+        }
+        throw
+    }
+}
+
+function New-AgentIdentityBlueprintServicePrincipal {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$BlueprintAppId
+    )
+    
+    Write-Status "Creating Agent Identity Blueprint Service Principal..." -Type Info
+    
+    try {
+        # Check if service principal already exists
+        $existingSp = Get-MgServicePrincipal -Filter "appId eq '$BlueprintAppId'" -ErrorAction SilentlyContinue
+        
+        if ($existingSp) {
+            Write-Status "Found existing service principal for blueprint (ID: $($existingSp.Id))" -Type Success
+            return $existingSp
+        }
+        
+        # Prepare the body for the service principal creation
+        $body = @{
+            appId = $BlueprintAppId
+        } | ConvertTo-Json
+        
+        # Create the service principal using the specialized endpoint
+        Write-Status "Using specialized Agent Identity Blueprint service principal endpoint..." -Type Info
+        
+        $servicePrincipalResponse = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/serviceprincipals/graph.agentIdentityBlueprintPrincipal" -Body $body
+        
+        Write-Status "Successfully created Agent Identity Blueprint Service Principal" -Type Success
+        Write-Status "Service Principal ID: $($servicePrincipalResponse.id)" -Type Info
+        
+        # Wait for replication
+        Start-Sleep -Seconds 2
+        
+        return $servicePrincipalResponse
+    }
+    catch {
+        Write-Status "Error creating service principal: $($_.Exception.Message)" -Type Error
+        # Check if it's a permissions error
+        if ($_.Exception.Message -like "*Insufficient privileges*" -or $_.Exception.Message -like "*Unauthorized*") {
+            Write-Status "Required permission: AgentIdentityBlueprintPrincipal.Create" -Type Warning
+        }
+        throw
     }
 }
 
 function New-AgentIdentity {
     param(
         [Parameter(Mandatory=$true)]
-        [string]$BlueprintId,
+        [string]$BlueprintAppId,
         
         [Parameter(Mandatory=$true)]
         [string]$AgentName,
@@ -628,40 +692,94 @@ function New-AgentIdentity {
         [string]$Type,
         
         [Parameter(Mandatory=$false)]
+        [string]$CurrentUserId,
+        
+        [Parameter(Mandatory=$false)]
         [string]$ServiceAccountUpn
     )
     
     Write-Status "Creating Agent Identity: $AgentName (Type: $Type)" -Type Info
     
     try {
-        # Note: Agent Identity API is in preview
-        # Manual setup required via Azure Portal
-        
-        Write-Host "`n--- Agent Identity Creation Required ---`n" -ForegroundColor Yellow
-        Write-Status "Agent Identities must be created manually via Azure Portal:" -Type Info
-        Write-Status "" -Type Info
-        Write-Status "1. Navigate to your Agent Identity Blueprint: $BlueprintId" -Type Info
-        Write-Status "2. Click 'Create agent identity'" -Type Info
-        Write-Status "3. Type: $Type" -Type Info
-        Write-Status "4. Name: $AgentName" -Type Info
-        
-        if ($Type -eq 'AgentUser' -and $ServiceAccountUpn) {
-            Write-Status "5. Associated User: $ServiceAccountUpn" -Type Info
+        # Get current user ID if not provided
+        if (-not $CurrentUserId) {
+            try {
+                $currentUser = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/me" -ErrorAction SilentlyContinue
+                $CurrentUserId = $currentUser.id
+            }
+            catch {
+                Write-Status "Could not retrieve current user ID for agent ownership" -Type Warning
+            }
         }
         
-        Write-Status "" -Type Info
+        # Build the request body
+        $Body = @{
+            displayName = $AgentName
+            AgentIdentityBlueprintId = $BlueprintAppId
+        }
         
+        # Add owner if available
+        if ($CurrentUserId) {
+            $Body["owners@odata.bind"] = @("https://graph.microsoft.com/v1.0/users/$CurrentUserId")
+        }
+        
+        $JsonBody = $Body | ConvertTo-Json -Depth 5
+        
+        Write-Status "Creating $Type agent identity using beta endpoint..." -Type Info
+        
+        # Create the agent identity using the specialized endpoint
+        $agentIdentity = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/serviceprincipals/Microsoft.Graph.AgentIdentity" -Body $JsonBody
+        
+        Write-Status "Successfully created Agent Identity" -Type Success
+        Write-Status "Agent Identity ID: $($agentIdentity.id)" -Type Info
+        Write-Status "Display Name: $($agentIdentity.displayName)" -Type Info
+        
+        # If this is an AgentUser type, create the user association
+        if ($Type -eq 'AgentUser' -and $ServiceAccountUpn) {
+            Write-Status "Creating Agent User association for: $ServiceAccountUpn" -Type Info
+            try {
+                # Create Agent ID User (this requires the agent identity to exist first)
+                $userBody = @{
+                    displayName = "$AgentName User"
+                    userPrincipalName = $ServiceAccountUpn
+                } | ConvertTo-Json
+                
+                $agentUser = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/serviceprincipals/$($agentIdentity.id)/agentIdUsers" -Body $userBody
+                
+                Write-Status "Successfully created Agent User" -Type Success
+                Write-Status "Agent User ID: $($agentUser.id)" -Type Info
+                
+                # Add user info to the result
+                $agentIdentity | Add-Member -MemberType NoteProperty -Name "AgentUserId" -Value $agentUser.id
+                $agentIdentity | Add-Member -MemberType NoteProperty -Name "AgentUserUpn" -Value $ServiceAccountUpn
+            }
+            catch {
+                Write-Status "Note: Could not create Agent User automatically. This may need manual setup." -Type Warning
+                Write-Status "Error: $($_.Exception.Message)" -Type Warning
+            }
+        }
+        
+        return $agentIdentity
+    }
+    catch {
+        Write-Status "Error creating Agent Identity: $($_.Exception.Message)" -Type Error
+        
+        # Provide helpful guidance based on error
+        if ($_.Exception.Message -like "*Insufficient privileges*" -or $_.Exception.Message -like "*Unauthorized*") {
+            Write-Status "This feature may not be available in your tenant or you lack required permissions." -Type Warning
+            Write-Status "Required permissions: AgentIdentity.ReadWrite.All" -Type Warning
+        }
+        
+        # Return a manual setup placeholder
         return @{
             Id = "MANUAL_SETUP_REQUIRED"
             Name = $AgentName
             Type = $Type
-            BlueprintId = $BlueprintId
+            BlueprintId = $BlueprintAppId
+            ServiceAccountUpn = $ServiceAccountUpn
             ManualSetupRequired = $true
+            Error = $_.Exception.Message
         }
-    }
-    catch {
-        Write-Status "Note: Agent Identity creation requires manual configuration" -Type Warning
-        return $null
     }
 }
 
@@ -681,21 +799,68 @@ function Invoke-Setup {
         # Step 1: Connect to Microsoft Graph
         $script:Results.TenantId = Connect-MicrosoftGraphIfNeeded -TenantIdParam $TenantId
         
-        # Step 2: Create Agent Identity Blueprint Application (Orchestrator)
-        Write-Host "`n--- Step 1: Creating Agent Identity Blueprint Application ---`n" -ForegroundColor Yellow
-        Write-Status "Creating application that will serve as the Agent Identity Blueprint..." -Type Info
-        $blueprintApp = Get-OrCreateApplication -DisplayName $script:Config.OrchestratorName -RequiresSecret $false
-        
-        $script:Results.Orchestrator = @{
-            ApplicationId = $blueprintApp.Id
-            ClientId = $blueprintApp.AppId
-            DisplayName = $blueprintApp.DisplayName
+        # Get current user ID for ownership
+        $currentUserId = $null
+        try {
+            $currentUser = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/me" -ErrorAction SilentlyContinue
+            $currentUserId = $currentUser.id
+            Write-Status "Current user: $($currentUser.userPrincipalName)" -Type Info
+        }
+        catch {
+            Write-Status "Could not retrieve current user information" -Type Warning
         }
         
-        # Step 3: Add client secret to blueprint application
-        Write-Host "`n--- Step 2: Adding Client Secret to Blueprint ---`n" -ForegroundColor Yellow
-        $blueprintSecret = New-ApplicationSecret -ApplicationId $blueprintApp.Id -DisplayName $script:Config.OrchestratorName
-        $script:Results.Orchestrator.ClientSecret = $blueprintSecret
+        # Step 2: Create Agent Identity Blueprint Application using specialized endpoint
+        Write-Host "`n--- Step 1: Creating Agent Identity Blueprint ---`n" -ForegroundColor Yellow
+        Write-Status "Using specialized Agent Identity Blueprint endpoint..." -Type Info
+        
+        if (-not $SkipAgentIdentities) {
+            try {
+                $blueprintApp = New-AgentIdentityBlueprintApp -DisplayName $script:Config.OrchestratorName -CurrentUserId $currentUserId
+                
+                $script:Results.Orchestrator = @{
+                    ApplicationId = $blueprintApp.id
+                    ClientId = $blueprintApp.appId
+                    DisplayName = $blueprintApp.displayName
+                }
+                
+                # Step 3: Add client secret to blueprint
+                Write-Host "`n--- Step 2: Adding Client Secret to Blueprint ---`n" -ForegroundColor Yellow
+                $blueprintSecret = New-ApplicationSecret -ApplicationId $blueprintApp.id -DisplayName $script:Config.OrchestratorName
+                $script:Results.Orchestrator.ClientSecret = $blueprintSecret
+            }
+            catch {
+                Write-Status "Could not create Agent Identity Blueprint using API. Falling back to standard application." -Type Warning
+                Write-Status "Error: $($_.Exception.Message)" -Type Warning
+                
+                # Fallback to standard application creation
+                $blueprintApp = Get-OrCreateApplication -DisplayName $script:Config.OrchestratorName -RequiresSecret $false
+                
+                $script:Results.Orchestrator = @{
+                    ApplicationId = $blueprintApp.Id
+                    ClientId = $blueprintApp.AppId
+                    DisplayName = $blueprintApp.DisplayName
+                }
+                
+                $blueprintSecret = New-ApplicationSecret -ApplicationId $blueprintApp.Id -DisplayName $script:Config.OrchestratorName
+                $script:Results.Orchestrator.ClientSecret = $blueprintSecret
+                $script:Results.Orchestrator.UsedFallback = $true
+            }
+        }
+        else {
+            # Skip agent identities - use standard app creation
+            Write-Status "Skipping Agent Identity Blueprint creation (use without -SkipAgentIdentities to enable)" -Type Info
+            $blueprintApp = Get-OrCreateApplication -DisplayName $script:Config.OrchestratorName -RequiresSecret $false
+            
+            $script:Results.Orchestrator = @{
+                ApplicationId = $blueprintApp.Id
+                ClientId = $blueprintApp.AppId
+                DisplayName = $blueprintApp.DisplayName
+            }
+            
+            $blueprintSecret = New-ApplicationSecret -ApplicationId $blueprintApp.Id -DisplayName $script:Config.OrchestratorName
+            $script:Results.Orchestrator.ClientSecret = $blueprintSecret
+        }
         
         # Step 4: Create Downstream Service Applications
         Write-Host "`n--- Step 3: Creating Downstream Service Applications ---`n" -ForegroundColor Yellow
@@ -734,17 +899,39 @@ function Invoke-Setup {
         Set-InheritablePermissions -BlueprintApplicationId $script:Results.Orchestrator.ClientId `
                                   -DownstreamServices $downstreamServicesForPermissions
         
-        # Step 6: Create Service Principal for Blueprint
+        # Step 6: Create Service Principal for Blueprint using specialized endpoint
         Write-Host "`n--- Step 5: Creating Service Principal for Blueprint ---`n" -ForegroundColor Yellow
-        $blueprintSp = Get-MgServicePrincipal -Filter "appId eq '$($script:Results.Orchestrator.ClientId)'" -ErrorAction SilentlyContinue
         
-        if (-not $blueprintSp) {
-            Write-Status "Creating service principal for blueprint..." -Type Info
-            $blueprintSp = New-MgServicePrincipal -AppId $script:Results.Orchestrator.ClientId
-            Start-Sleep -Seconds 2
-            Write-Status "Service principal created successfully" -Type Success
-        } else {
-            Write-Status "Service principal already exists" -Type Info
+        if (-not $SkipAgentIdentities -and -not $script:Results.Orchestrator.UsedFallback) {
+            try {
+                $blueprintSp = New-AgentIdentityBlueprintServicePrincipal -BlueprintAppId $script:Results.Orchestrator.ClientId
+                Write-Status "Agent Identity Blueprint Service Principal created" -Type Success
+            }
+            catch {
+                Write-Status "Could not create service principal using specialized endpoint. Using standard method." -Type Warning
+                $blueprintSp = Get-MgServicePrincipal -Filter "appId eq '$($script:Results.Orchestrator.ClientId)'" -ErrorAction SilentlyContinue
+                
+                if (-not $blueprintSp) {
+                    Write-Status "Creating standard service principal for blueprint..." -Type Info
+                    $blueprintSp = New-MgServicePrincipal -AppId $script:Results.Orchestrator.ClientId
+                    Start-Sleep -Seconds 2
+                    Write-Status "Service principal created successfully" -Type Success
+                } else {
+                    Write-Status "Service principal already exists" -Type Info
+                }
+            }
+        }
+        else {
+            $blueprintSp = Get-MgServicePrincipal -Filter "appId eq '$($script:Results.Orchestrator.ClientId)'" -ErrorAction SilentlyContinue
+            
+            if (-not $blueprintSp) {
+                Write-Status "Creating service principal for blueprint..." -Type Info
+                $blueprintSp = New-MgServicePrincipal -AppId $script:Results.Orchestrator.ClientId
+                Start-Sleep -Seconds 2
+                Write-Status "Service principal created successfully" -Type Success
+            } else {
+                Write-Status "Service principal already exists" -Type Info
+            }
         }
         
         # Step 7: Grant Admin Consent for Inheritable Permissions
@@ -753,29 +940,37 @@ function Invoke-Setup {
         
         # Step 8: Handle Agent Identities (if not skipped)
         if (-not $SkipAgentIdentities) {
-            Write-Host "`n--- Step 7: Setting Up Agent Identity Blueprint and Identities ---`n" -ForegroundColor Yellow
+            Write-Host "`n--- Step 7: Creating Agent Identities ---`n" -ForegroundColor Yellow
             
-            # Create/configure Agent Identity Blueprint
-            $blueprint = Get-OrCreateAgentIdentityBlueprint `
-                -BlueprintName $script:Config.BlueprintName `
-                -BlueprintAppClientId $script:Results.Orchestrator.ClientId `
-                -DownstreamServices $downstreamServicesForPermissions
-            
-            $script:Results.Blueprint = $blueprint
+            # Store blueprint information
+            $script:Results.Blueprint = @{
+                Id = $script:Results.Orchestrator.ClientId
+                Name = $script:Config.BlueprintName
+                ApplicationId = $script:Results.Orchestrator.ClientId
+            }
             
             # Create Autonomous Agent Identity (for OrderService)
             Write-Host "`n--- Step 8: Creating Autonomous Agent Identity ---`n" -ForegroundColor Yellow
             Write-Status "This identity will be used for calling OrderService autonomously" -Type Info
             
-            if ($blueprint -and $blueprint.Id -ne "MANUAL_SETUP_REQUIRED") {
+            try {
                 $autonomousAgent = New-AgentIdentity `
-                    -BlueprintId $blueprint.Id `
+                    -BlueprintAppId $script:Results.Orchestrator.ClientId `
                     -AgentName $script:Config.AutonomousAgentName `
-                    -Type "Autonomous"
+                    -Type "Autonomous" `
+                    -CurrentUserId $currentUserId
                 
                 $script:Results.AutonomousAgent = $autonomousAgent
-            } else {
-                Write-Status "Blueprint must be created manually before creating agent identities" -Type Warning
+                
+                if ($autonomousAgent.ManualSetupRequired) {
+                    Write-Status "Agent Identity API not available. Manual setup required." -Type Warning
+                }
+                else {
+                    Write-Status "Autonomous Agent Identity created successfully!" -Type Success
+                }
+            }
+            catch {
+                Write-Status "Could not create Autonomous Agent Identity automatically" -Type Warning
                 $script:Results.AutonomousAgent = @{
                     Id = "MANUAL_SETUP_REQUIRED"
                     Name = $script:Config.AutonomousAgentName
@@ -801,16 +996,25 @@ function Invoke-Setup {
                     ManualSetupRequired = $true
                 }
             } else {
-                if ($blueprint -and $blueprint.Id -ne "MANUAL_SETUP_REQUIRED") {
+                try {
                     $agentUser = New-AgentIdentity `
-                        -BlueprintId $blueprint.Id `
+                        -BlueprintAppId $script:Results.Orchestrator.ClientId `
                         -AgentName $script:Config.AgentUserName `
                         -Type "AgentUser" `
+                        -CurrentUserId $currentUserId `
                         -ServiceAccountUpn $ServiceAccountUpn
                     
                     $script:Results.AgentUser = $agentUser
-                } else {
-                    Write-Status "Blueprint must be created manually before creating agent identities" -Type Warning
+                    
+                    if ($agentUser.ManualSetupRequired) {
+                        Write-Status "Agent Identity API not available. Manual setup required." -Type Warning
+                    }
+                    else {
+                        Write-Status "Agent User Identity created successfully!" -Type Success
+                    }
+                }
+                catch {
+                    Write-Status "Could not create Agent User Identity automatically" -Type Warning
                     $script:Results.AgentUser = @{
                         Id = "MANUAL_SETUP_REQUIRED"
                         Name = $script:Config.AgentUserName
