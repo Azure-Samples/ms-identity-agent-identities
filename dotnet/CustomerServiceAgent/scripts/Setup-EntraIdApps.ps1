@@ -65,20 +65,20 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$TenantId,
     
-    [Parameter(Mandatory=$false)]
-    [string]$SampleInstancePrefix = "CustomerService-",
+    [Parameter(Mandatory = $false)]
+    [string]$SampleInstancePrefix = "CustomerService1-",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [ValidateSet('PowerShell', 'Json', 'EnvVars', 'UpdateConfig')]
     [string]$OutputFormat = 'PowerShell',
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$SkipAgentIdentities,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$ServiceAccountUpn
 )
 
@@ -89,55 +89,55 @@ Set-StrictMode -Version Latest
 # Script configuration
 $script:Config = @{
     SampleInstancePrefix = $SampleInstancePrefix
-    BlueprintName = "${SampleInstancePrefix}Blueprint"
-    OrchestratorName = "${SampleInstancePrefix}Orchestrator"
-    Services = @(
+    BlueprintName        = "${SampleInstancePrefix}Blueprint"
+    OrchestratorName     = "${SampleInstancePrefix}Orchestrator"
+    Services             = @(
         @{
-            Name = "OrderAPI"
+            Name        = "OrderAPI"
             DisplayName = "${SampleInstancePrefix}OrderAPI"
-            Scopes = @(
+            Scopes      = @(
                 @{ Name = "Orders.Read"; DisplayName = "Read order data"; Description = "Allows the application to read order information" }
             )
         },
         @{
-            Name = "ShippingAPI"
+            Name        = "ShippingAPI"
             DisplayName = "${SampleInstancePrefix}ShippingAPI"
-            Scopes = @(
+            Scopes      = @(
                 @{ Name = "Shipping.Read"; DisplayName = "Read shipping data"; Description = "Allows the application to read shipping information" }
                 @{ Name = "Shipping.Write"; DisplayName = "Write shipping data"; Description = "Allows the application to update shipping information" }
             )
         },
         @{
-            Name = "EmailAPI"
+            Name        = "EmailAPI"
             DisplayName = "${SampleInstancePrefix}EmailAPI"
-            Scopes = @(
+            Scopes      = @(
                 @{ Name = "Email.Send"; DisplayName = "Send email"; Description = "Allows the application to send email notifications" }
             )
         }
     )
-    AutonomousAgentName = "${SampleInstancePrefix}AutonomousAgent"
-    AgentUserName = "${SampleInstancePrefix}AgentUser"
+    AutonomousAgentName  = "${SampleInstancePrefix}AutonomousAgent"
+    AgentUserName        = "${SampleInstancePrefix}AgentUser"
 }
 
 # Store results
 $script:Results = @{
-    TenantId = $null
-    Orchestrator = $null
-    Services = @{}
-    Blueprint = $null
+    TenantId        = $null
+    Orchestrator    = $null
+    Services        = @{}
+    Blueprint       = $null
     AutonomousAgent = $null
-    AgentUser = $null
-    Errors = @()
+    AgentUser       = $null
+    Errors          = @()
 }
 
 #region Helper Functions
 
 function Write-Status {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$Message,
         
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [ValidateSet('Info', 'Success', 'Warning', 'Error')]
         [string]$Type = 'Info'
     )
@@ -172,14 +172,24 @@ function Connect-MicrosoftGraphIfNeeded {
             Write-Status "Not connected to Microsoft Graph. Connecting..." -Type Info
             
             $scopes = @(
+                # To create an agent blueprint and it's service principal
+                'AgentIdentityBlueprint.Create',
+                'AgentIdentityBlueprintPrincipal.Create',
+                'AppRoleAssignment.ReadWrite.All',
                 'Application.ReadWrite.All',
-                'Directory.ReadWrite.All',
-                'AppRoleAssignment.ReadWrite.All'
+                'User.ReadWrite.All',
+
+                # for adding creds
+                'AgentIdentityBlueprint.AddRemoveCreds.All',
+
+                # For inhertitable permissions
+                'AgentIdentityBlueprint.ReadWrite.All'
             )
             
             if ($TenantIdParam) {
                 Connect-MgGraph -TenantId $TenantIdParam -Scopes $scopes -NoWelcome
-            } else {
+            }
+            else {
                 Connect-MgGraph -Scopes $scopes -NoWelcome
             }
             
@@ -197,10 +207,10 @@ function Connect-MicrosoftGraphIfNeeded {
 
 function Get-OrCreateApplication {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$DisplayName,
         
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [bool]$RequiresSecret = $false
     )
     
@@ -219,7 +229,7 @@ function Get-OrCreateApplication {
         # Create new app
         Write-Status "Creating new app: $DisplayName" -Type Info
         $appParams = @{
-            DisplayName = $DisplayName
+            DisplayName    = $DisplayName
             SignInAudience = "AzureADMyOrg"
         }
         
@@ -239,10 +249,10 @@ function Get-OrCreateApplication {
 
 function New-ApplicationSecret {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$ApplicationId,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$DisplayName
     )
     
@@ -251,7 +261,7 @@ function New-ApplicationSecret {
     try {
         $passwordCredential = @{
             displayName = "Generated by Setup Script"
-            endDateTime = (Get-Date).AddMonths(24)
+            endDateTime = (Get-Date).AddDays(90).ToString("o")
         }
         
         $secret = Add-MgApplicationPassword -ApplicationId $ApplicationId -PasswordCredential $passwordCredential
@@ -267,13 +277,13 @@ function New-ApplicationSecret {
 
 function Set-ApiScopes {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$ApplicationId,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$AppClientId,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [array]$Scopes
     )
     
@@ -292,32 +302,73 @@ function Set-ApiScopes {
         
         # Configure OAuth2 permissions (scopes)
         $oauth2Permissions = @()
+        $needsUpdate = $false
+        
+        # Check if we need to add any new scopes
         foreach ($scope in $Scopes) {
-            $scopeId = [Guid]::NewGuid().ToString()
-            
             # Check if scope already exists
+            $existing = $null
             if ($app.Api.Oauth2PermissionScopes) {
                 $existing = $app.Api.Oauth2PermissionScopes | Where-Object { $_.Value -eq $scope.Name }
-                if ($existing) {
-                    Write-Status "Scope already exists: $($scope.Name)" -Type Info
-                    $oauth2Permissions += $existing
-                    continue
+            }
+            
+            if ($existing) {
+                Write-Status "Scope already exists: $($scope.Name)" -Type Info
+                $oauth2Permissions += $existing
+            }
+            else {
+                $scopeId = [Guid]::NewGuid().ToString()
+                $oauth2Permissions += @{
+                    Id                      = $scopeId
+                    AdminConsentDescription = $scope.Description
+                    AdminConsentDisplayName = $scope.DisplayName
+                    IsEnabled               = $true
+                    Type                    = "Admin"
+                    Value                   = $scope.Name
+                }
+                $needsUpdate = $true
+                Write-Status "Adding scope: $($scope.Name)" -Type Success
+            }
+        }
+        
+        # Only update if we have new scopes to add
+        if ($needsUpdate) {
+            Write-Status "Updating OAuth2 permission scopes..." -Type Info
+            
+            # Step 1: If there are existing enabled scopes, disable them first
+            if ($app.Api.Oauth2PermissionScopes -and $app.Api.Oauth2PermissionScopes.Count -gt 0) {
+                $hasEnabledScopes = $app.Api.Oauth2PermissionScopes | Where-Object { $_.IsEnabled -eq $true }
+                
+                if ($hasEnabledScopes) {
+                    Write-Status "Disabling existing scopes before update..." -Type Info
+                    
+                    # Create disabled versions of all existing scopes
+                    $disabledScopes = @()
+                    foreach ($existingScope in $app.Api.Oauth2PermissionScopes) {
+                        $disabledScopes += @{
+                            Id                      = $existingScope.Id
+                            AdminConsentDescription = $existingScope.AdminConsentDescription
+                            AdminConsentDisplayName = $existingScope.AdminConsentDisplayName
+                            IsEnabled               = $false
+                            Type                    = $existingScope.Type
+                            Value                   = $existingScope.Value
+                        }
+                    }
+                    
+                    # Update with disabled scopes
+                    $disableParams = @{
+                        Api = @{
+                            Oauth2PermissionScopes = $disabledScopes
+                        }
+                    }
+                    
+                    Update-MgApplication -ApplicationId $ApplicationId -BodyParameter $disableParams
+                    Write-Status "Existing scopes disabled" -Type Info
+                    Start-Sleep -Seconds 3
                 }
             }
             
-            $oauth2Permissions += @{
-                Id = $scopeId
-                AdminConsentDescription = $scope.Description
-                AdminConsentDisplayName = $scope.DisplayName
-                IsEnabled = $true
-                Type = "Admin"
-                Value = $scope.Name
-            }
-            
-            Write-Status "Adding scope: $($scope.Name)" -Type Success
-        }
-        
-        if ($oauth2Permissions.Count -gt 0) {
+            # Step 2: Update with the new/updated scopes (now enabled)
             $apiParams = @{
                 Api = @{
                     Oauth2PermissionScopes = $oauth2Permissions
@@ -328,6 +379,9 @@ function Set-ApiScopes {
             Write-Status "API scopes configured successfully" -Type Success
             Start-Sleep -Seconds 2
         }
+        else {
+            Write-Status "All required scopes already exist, no update needed" -Type Info
+        }
     }
     catch {
         Write-Status "Error configuring API scopes: $($_.Exception.Message)" -Type Error
@@ -337,10 +391,10 @@ function Set-ApiScopes {
 
 function Set-InheritablePermissions {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$BlueprintApplicationId,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [array]$DownstreamServices
     )
     
@@ -354,10 +408,7 @@ function Set-InheritablePermissions {
             Write-Status "Blueprint application not found" -Type Error
             return
         }
-        
-        # Build required resource access for downstream APIs
-        $allResourceAccess = @()
-        
+                
         foreach ($service in $DownstreamServices) {
             # Get the service application to find scope IDs
             $serviceApp = Get-MgApplication -Filter "appId eq '$($service.ClientId)'"
@@ -366,7 +417,7 @@ function Set-InheritablePermissions {
                 Write-Status "Service application not found: $($service.DisplayName)" -Type Warning
                 continue
             }
-            
+        
             # Create service principal if it doesn't exist
             $serviceSp = Get-MgServicePrincipal -Filter "appId eq '$($service.ClientId)'" -ErrorAction SilentlyContinue
             if (-not $serviceSp) {
@@ -374,38 +425,28 @@ function Set-InheritablePermissions {
                 $serviceSp = New-MgServicePrincipal -AppId $service.ClientId
                 Start-Sleep -Seconds 2
             }
-            
-            # Add individual scope permissions (inheritable permissions for Agent Identity Blueprint)
-            # These permissions will be inherited by agent identities created from the blueprint
-            $resourceAccess = @()
-            
-            # Add each scope defined for the service as delegated permissions
-            if ($serviceApp.Api.Oauth2PermissionScopes -and $serviceApp.Api.Oauth2PermissionScopes.Count -gt 0) {
-                foreach ($scope in $serviceApp.Api.Oauth2PermissionScopes) {
-                    $resourceAccess += @{
-                        Id = $scope.Id
-                        Type = "Scope"
-                    }
-                    Write-Status "Adding inheritable permission: $($service.DisplayName)/$($scope.Value)" -Type Info
+        
+            # Build the request body
+            $Body = [PSCustomObject]@{
+                resourceAppId     = $service.ClientId
+                inheritableScopes = [PSCustomObject]@{
+                    "@odata.type" = "microsoft.graph.enumeratedScopes"
+                    scopes        = @($service.Scopes.Name)
+                    kind = "enumerated"
                 }
             }
-            
-            if ($resourceAccess.Count -gt 0) {
-                $allResourceAccess += @{
-                    ResourceAppId = $service.ClientId
-                    ResourceAccess = $resourceAccess
-                }
-            }
+        
+            $JsonBody = $Body | ConvertTo-Json -Depth 5
+            Write-Debug "Request Body: $JsonBody"
+        
+            # Use Invoke-MgRestMethod to make the API call with the stored Agent Blueprint ID
+            $apiUrl = "https://graph.microsoft.com/beta/applications/microsoft.graph.agentIdentityBlueprint/$($BlueprintApplicationId)/inheritablePermissions"
+            Write-Debug "API URL: $apiUrl"
+            $result = Invoke-MgRestMethod -Method POST -Uri $apiUrl -Body $JsonBody -ContentType "application/json"
         }
         
-        if ($allResourceAccess.Count -gt 0) {
-            # Update the blueprint with inheritable permissions
-            Update-MgApplication -ApplicationId $blueprintApp.Id -RequiredResourceAccess $allResourceAccess
-            Write-Status "Inheritable permissions configured successfully" -Type Success
-            Start-Sleep -Seconds 2
-        } else {
-            Write-Status "No inheritable permissions to configure" -Type Warning
-        }
+        Write-Host "Successfully added inheritable permissions to Agent Identity Blueprints" -ForegroundColor Green
+        Write-Host "Permissions are now available for inheritance by agent blueprints" -ForegroundColor Green
     }
     catch {
         Write-Status "Error configuring inheritable permissions: $($_.Exception.Message)" -Type Error
@@ -413,15 +454,16 @@ function Set-InheritablePermissions {
     }
 }
 
+
 function Grant-ApiPermissions {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$ClientApplicationId,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$ResourceAppClientId,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [array]$ScopeNames
     )
     
@@ -449,7 +491,7 @@ function Grant-ApiPermissions {
             $scope = $resourceApp.Api.Oauth2PermissionScopes | Where-Object { $_.Value -eq $scopeName }
             if ($scope) {
                 $resourceAccess += @{
-                    Id = $scope.Id
+                    Id   = $scope.Id
                     Type = "Scope"
                 }
                 Write-Status "Adding permission: $scopeName" -Type Info
@@ -468,16 +510,17 @@ function Grant-ApiPermissions {
             # Update existing
             $updatedAccess = $clientApp.RequiredResourceAccess | Where-Object { $_.ResourceAppId -ne $ResourceAppClientId }
             $updatedAccess += @{
-                ResourceAppId = $ResourceAppClientId
+                ResourceAppId  = $ResourceAppClientId
                 ResourceAccess = $resourceAccess
             }
             
             Update-MgApplication -ApplicationId $clientApp.Id -RequiredResourceAccess $updatedAccess
-        } else {
+        }
+        else {
             # Add new
             $allAccess = @($clientApp.RequiredResourceAccess)
             $allAccess += @{
-                ResourceAppId = $ResourceAppClientId
+                ResourceAppId  = $ResourceAppClientId
                 ResourceAccess = $resourceAccess
             }
             
@@ -495,7 +538,7 @@ function Grant-ApiPermissions {
 
 function Grant-AdminConsent {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$ClientAppClientId
     )
     
@@ -544,10 +587,10 @@ function Grant-AdminConsent {
                 if ($scopeObj) {
                     # Create OAuth2 permission grant (admin consent)
                     $grantParams = @{
-                        ClientId = $clientSp.Id
+                        ClientId    = $clientSp.Id
                         ConsentType = "AllPrincipals"
-                        ResourceId = $resourceSp.Id
-                        Scope = $scopeObj.Value
+                        ResourceId  = $resourceSp.Id
+                        Scope       = $scopeObj.Value
                     }
                     
                     New-MgOauth2PermissionGrant -BodyParameter $grantParams | Out-Null
@@ -567,10 +610,10 @@ function Grant-AdminConsent {
 
 function New-AgentIdentityBlueprintApp {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$DisplayName,
         
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [string]$CurrentUserId
     )
     
@@ -600,19 +643,21 @@ function New-AgentIdentityBlueprintApp {
         
         # Build the request body for Agent Identity Blueprint
         $Body = @{
-            displayName = $DisplayName
+            displayName   = $DisplayName
+            "@odata.type" = "Microsoft.Graph.AgentIdentityBlueprint"
         }
         
         # Add owner if available
         if ($CurrentUserId) {
             $Body["owners@odata.bind"] = @("https://graph.microsoft.com/v1.0/users/$CurrentUserId")
+            $Body["sponsors@odata.bind"] = @("https://graph.microsoft.com/v1.0/users/$CurrentUserId")
         }
         
         $JsonBody = $Body | ConvertTo-Json -Depth 5
         Write-Status "Creating Agent Identity Blueprint using beta endpoint..." -Type Info
         
         # Use the specialized Agent Identity Blueprint endpoint
-        $BlueprintRes = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/applications/graph.agentIdentityBlueprint" -Body $JsonBody
+        $BlueprintRes = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/applications/graph.agentIdentityBlueprint" -Body $JsonBody -Headers @{ "OData-Version" = "4.0" } 
         
         Write-Status "Successfully created Agent Identity Blueprint" -Type Success
         Write-Status "Blueprint Application ID: $($BlueprintRes.id)" -Type Info
@@ -636,7 +681,7 @@ function New-AgentIdentityBlueprintApp {
 
 function New-AgentIdentityBlueprintServicePrincipal {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$BlueprintAppId
     )
     
@@ -681,20 +726,20 @@ function New-AgentIdentityBlueprintServicePrincipal {
 
 function New-AgentIdentity {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$BlueprintAppId,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$AgentName,
         
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [ValidateSet('Autonomous', 'AgentUser')]
         [string]$Type,
         
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [string]$CurrentUserId,
         
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [string]$ServiceAccountUpn
     )
     
@@ -714,7 +759,7 @@ function New-AgentIdentity {
         
         # Build the request body
         $Body = @{
-            displayName = $AgentName
+            displayName              = $AgentName
             AgentIdentityBlueprintId = $BlueprintAppId
         }
         
@@ -740,7 +785,7 @@ function New-AgentIdentity {
             try {
                 # Create Agent ID User (this requires the agent identity to exist first)
                 $userBody = @{
-                    displayName = "$AgentName User"
+                    displayName       = "$AgentName User"
                     userPrincipalName = $ServiceAccountUpn
                 } | ConvertTo-Json
                 
@@ -772,13 +817,13 @@ function New-AgentIdentity {
         
         # Return a manual setup placeholder
         return @{
-            Id = "MANUAL_SETUP_REQUIRED"
-            Name = $AgentName
-            Type = $Type
-            BlueprintId = $BlueprintAppId
-            ServiceAccountUpn = $ServiceAccountUpn
+            Id                  = "MANUAL_SETUP_REQUIRED"
+            Name                = $AgentName
+            Type                = $Type
+            BlueprintId         = $BlueprintAppId
+            ServiceAccountUpn   = $ServiceAccountUpn
             ManualSetupRequired = $true
-            Error = $_.Exception.Message
+            Error               = $_.Exception.Message
         }
     }
 }
@@ -820,14 +865,11 @@ function Invoke-Setup {
                 
                 $script:Results.Orchestrator = @{
                     ApplicationId = $blueprintApp.id
-                    ClientId = $blueprintApp.appId
-                    DisplayName = $blueprintApp.displayName
+                    ClientId      = $blueprintApp.appId
+                    DisplayName   = $blueprintApp.displayName
+                    UsedFallback  = $false
                 }
                 
-                # Step 3: Add client secret to blueprint
-                Write-Host "`n--- Step 2: Adding Client Secret to Blueprint ---`n" -ForegroundColor Yellow
-                $blueprintSecret = New-ApplicationSecret -ApplicationId $blueprintApp.id -DisplayName $script:Config.OrchestratorName
-                $script:Results.Orchestrator.ClientSecret = $blueprintSecret
             }
             catch {
                 Write-Status "Could not create Agent Identity Blueprint using API. Falling back to standard application." -Type Warning
@@ -838,12 +880,9 @@ function Invoke-Setup {
                 
                 $script:Results.Orchestrator = @{
                     ApplicationId = $blueprintApp.Id
-                    ClientId = $blueprintApp.AppId
-                    DisplayName = $blueprintApp.DisplayName
+                    ClientId      = $blueprintApp.AppId
+                    DisplayName   = $blueprintApp.DisplayName
                 }
-                
-                $blueprintSecret = New-ApplicationSecret -ApplicationId $blueprintApp.Id -DisplayName $script:Config.OrchestratorName
-                $script:Results.Orchestrator.ClientSecret = $blueprintSecret
                 $script:Results.Orchestrator.UsedFallback = $true
             }
         }
@@ -854,51 +893,11 @@ function Invoke-Setup {
             
             $script:Results.Orchestrator = @{
                 ApplicationId = $blueprintApp.Id
-                ClientId = $blueprintApp.AppId
-                DisplayName = $blueprintApp.DisplayName
-            }
-            
-            $blueprintSecret = New-ApplicationSecret -ApplicationId $blueprintApp.Id -DisplayName $script:Config.OrchestratorName
-            $script:Results.Orchestrator.ClientSecret = $blueprintSecret
-        }
-        
-        # Step 4: Create Downstream Service Applications
-        Write-Host "`n--- Step 3: Creating Downstream Service Applications ---`n" -ForegroundColor Yellow
-        foreach ($service in $script:Config.Services) {
-            Write-Status "Processing service: $($service.DisplayName)" -Type Info
-            
-            $serviceApp = Get-OrCreateApplication -DisplayName $service.DisplayName
-            
-            # Configure API scopes
-            Set-ApiScopes -ApplicationId $serviceApp.Id -AppClientId $serviceApp.AppId -Scopes $service.Scopes
-            
-            $script:Results.Services[$service.Name] = @{
-                ApplicationId = $serviceApp.Id
-                ClientId = $serviceApp.AppId
-                DisplayName = $serviceApp.DisplayName
-                Scopes = $service.Scopes.Name
-            }
-            
-            Write-Status "Service $($service.DisplayName) configured successfully`n" -Type Success
-        }
-        
-        # Step 5: Configure Inheritable Permissions (downstream API permissions, not Graph)
-        Write-Host "`n--- Step 4: Configuring Inheritable Permissions for Blueprint ---`n" -ForegroundColor Yellow
-        Write-Status "Setting up inheritable permissions to downstream APIs..." -Type Info
-        
-        $downstreamServicesForPermissions = @()
-        foreach ($service in $script:Config.Services) {
-            $serviceResult = $script:Results.Services[$service.Name]
-            $downstreamServicesForPermissions += @{
-                ClientId = $serviceResult.ClientId
-                DisplayName = $serviceResult.DisplayName
-                Scopes = $service.Scopes
+                ClientId      = $blueprintApp.AppId
+                DisplayName   = $blueprintApp.DisplayName
             }
         }
-        
-        Set-InheritablePermissions -BlueprintApplicationId $script:Results.Orchestrator.ClientId `
-                                  -DownstreamServices $downstreamServicesForPermissions
-        
+
         # Step 6: Create Service Principal for Blueprint using specialized endpoint
         Write-Host "`n--- Step 5: Creating Service Principal for Blueprint ---`n" -ForegroundColor Yellow
         
@@ -916,7 +915,8 @@ function Invoke-Setup {
                     $blueprintSp = New-MgServicePrincipal -AppId $script:Results.Orchestrator.ClientId
                     Start-Sleep -Seconds 2
                     Write-Status "Service principal created successfully" -Type Success
-                } else {
+                }
+                else {
                     Write-Status "Service principal already exists" -Type Info
                 }
             }
@@ -929,10 +929,59 @@ function Invoke-Setup {
                 $blueprintSp = New-MgServicePrincipal -AppId $script:Results.Orchestrator.ClientId
                 Start-Sleep -Seconds 2
                 Write-Status "Service principal created successfully" -Type Success
-            } else {
+            }
+            else {
                 Write-Status "Service principal already exists" -Type Info
             }
         }
+
+        # Step 3: Add client secret to blueprint
+        Write-Host "`n--- Step 2: Adding Client Secret to Blueprint ---`n" -ForegroundColor Yellow
+        $passwordCredential = @{
+            displayName = "1st blueprint secret for dev/test. Not recommended for production use"
+            endDateTime = (Get-Date).AddDays(90).ToString("o")
+        }
+        $secretResult = Add-MgApplicationPassword -ApplicationId $script:Results.Orchestrator.ApplicationId -PasswordCredential $passwordCredential
+        $script:Results.Orchestrator.ClientSecret = $($secretResult.SecretText)
+        
+        # Step 4: Create Downstream Service Applications
+        Write-Host "`n--- Step 3: Creating Downstream Service Applications ---`n" -ForegroundColor Yellow
+        foreach ($service in $script:Config.Services) {
+            Write-Status "Processing service: $($service.DisplayName)" -Type Info
+            
+            $serviceApp = Get-OrCreateApplication -DisplayName $service.DisplayName
+            
+            # Configure API scopes
+            Set-ApiScopes -ApplicationId $serviceApp.Id -AppClientId $serviceApp.AppId -Scopes $service.Scopes
+            
+            $script:Results.Services[$service.Name] = @{
+                ApplicationId = $serviceApp.Id
+                ClientId      = $serviceApp.AppId
+                DisplayName   = $serviceApp.DisplayName
+                Scopes        = $service.Scopes.Name
+            }
+            
+            Write-Status "Service $($service.DisplayName) configured successfully`n" -Type Success
+        }
+        
+        # Step 5: Configure Inheritable Permissions (downstream API permissions, not Graph)
+        Write-Host "`n--- Step 4: Configuring Inheritable Permissions for Blueprint ---`n" -ForegroundColor Yellow
+        Write-Status "Setting up inheritable permissions to downstream APIs..." -Type Info
+        
+        $downstreamServicesForPermissions = @()
+        foreach ($service in $script:Config.Services) {
+            $serviceResult = $script:Results.Services[$service.Name]
+            $downstreamServicesForPermissions += @{
+                ClientId    = $serviceResult.ClientId
+                DisplayName = $serviceResult.DisplayName
+                Scopes      = $service.Scopes
+            }
+        }
+        
+        Set-InheritablePermissions -BlueprintApplicationId $script:Results.Orchestrator.ClientId `
+            -DownstreamServices $downstreamServicesForPermissions
+        
+ 
         
         # Step 7: Grant Admin Consent for Inheritable Permissions
         Write-Host "`n--- Step 6: Granting Admin Consent for Inheritable Permissions ---`n" -ForegroundColor Yellow
@@ -944,8 +993,8 @@ function Invoke-Setup {
             
             # Store blueprint information
             $script:Results.Blueprint = @{
-                Id = $script:Results.Orchestrator.ClientId
-                Name = $script:Config.BlueprintName
+                Id            = $script:Results.Orchestrator.ClientId
+                Name          = $script:Config.BlueprintName
                 ApplicationId = $script:Results.Orchestrator.ClientId
             }
             
@@ -972,10 +1021,10 @@ function Invoke-Setup {
             catch {
                 Write-Status "Could not create Autonomous Agent Identity automatically" -Type Warning
                 $script:Results.AutonomousAgent = @{
-                    Id = "MANUAL_SETUP_REQUIRED"
-                    Name = $script:Config.AutonomousAgentName
-                    Type = "Autonomous"
-                    Purpose = "For calling OrderService autonomously"
+                    Id                  = "MANUAL_SETUP_REQUIRED"
+                    Name                = $script:Config.AutonomousAgentName
+                    Type                = "Autonomous"
+                    Purpose             = "For calling OrderService autonomously"
                     ManualSetupRequired = $true
                 }
             }
@@ -989,13 +1038,14 @@ function Invoke-Setup {
                 $script:Results.Errors += "ServiceAccountUpn required for Agent User Identity"
                 
                 $script:Results.AgentUser = @{
-                    Id = "MANUAL_SETUP_REQUIRED"
-                    Name = $script:Config.AgentUserName
-                    Type = "AgentUser"
-                    Purpose = "For calling ShippingService and EmailService with user context"
+                    Id                  = "MANUAL_SETUP_REQUIRED"
+                    Name                = $script:Config.AgentUserName
+                    Type                = "AgentUser"
+                    Purpose             = "For calling ShippingService and EmailService with user context"
                     ManualSetupRequired = $true
                 }
-            } else {
+            }
+            else {
                 try {
                     $agentUser = New-AgentIdentity `
                         -BlueprintAppId $script:Results.Orchestrator.ClientId `
@@ -1016,16 +1066,17 @@ function Invoke-Setup {
                 catch {
                     Write-Status "Could not create Agent User Identity automatically" -Type Warning
                     $script:Results.AgentUser = @{
-                        Id = "MANUAL_SETUP_REQUIRED"
-                        Name = $script:Config.AgentUserName
-                        Type = "AgentUser"
-                        ServiceAccountUpn = $ServiceAccountUpn
-                        Purpose = "For calling ShippingService and EmailService with user context"
+                        Id                  = "MANUAL_SETUP_REQUIRED"
+                        Name                = $script:Config.AgentUserName
+                        Type                = "AgentUser"
+                        ServiceAccountUpn   = $ServiceAccountUpn
+                        Purpose             = "For calling ShippingService and EmailService with user context"
                         ManualSetupRequired = $true
                     }
                 }
             }
-        } else {
+        }
+        else {
             Write-Status "Skipping Agent Identity creation (use without -SkipAgentIdentities to enable)" -Type Info
         }
         
@@ -1062,8 +1113,8 @@ function Show-Results {
     # Show warnings/errors
     if ($script:Results.Errors.Count -gt 0) {
         Write-Host "`n--- Warnings/Notes ---`n" -ForegroundColor Yellow
-        foreach ($error in $script:Results.Errors) {
-            Write-Status $error -Type Warning
+        foreach ($resultError in $script:Results.Errors) {
+            Write-Status $resultError -Type Warning
         }
     }
     
@@ -1098,7 +1149,8 @@ function Show-Results {
     if ($OutputFormat -ne 'UpdateConfig') {
         Write-Status "5. Update your appsettings.json files with these values" -Type Info
         Write-Status "   Or run again with -OutputFormat UpdateConfig to update automatically" -Type Info
-    } else {
+    }
+    else {
         Write-Status "5. Verify the updated appsettings.json files" -Type Info
     }
     
@@ -1155,20 +1207,20 @@ function Show-JsonOutput {
     Write-Host "`n--- Configuration (JSON) ---`n" -ForegroundColor Cyan
     
     $output = @{
-        TenantId = $script:Results.TenantId
+        TenantId             = $script:Results.TenantId
         SampleInstancePrefix = $script:Config.SampleInstancePrefix
-        Blueprint = @{
-            ClientId = $script:Results.Orchestrator.ClientId
+        Blueprint            = @{
+            ClientId     = $script:Results.Orchestrator.ClientId
             ClientSecret = $script:Results.Orchestrator.ClientSecret
         }
-        Services = @{}
+        Services             = @{}
     }
     
     foreach ($serviceName in $script:Results.Services.Keys) {
         $service = $script:Results.Services[$serviceName]
         $output.Services[$serviceName] = @{
             ClientId = $service.ClientId
-            Scopes = @("api://$($service.ClientId)/.default")
+            Scopes   = @("api://$($service.ClientId)/.default")
         }
     }
     
@@ -1176,7 +1228,8 @@ function Show-JsonOutput {
         if ($script:Results.Blueprint.ManualSetupRequired) {
             $output.Blueprint.BlueprintId = "MANUAL_SETUP_REQUIRED"
             $output.Blueprint.Note = "Create blueprint manually in Azure Portal"
-        } else {
+        }
+        else {
             $output.Blueprint.BlueprintId = $script:Results.Blueprint.Id
         }
     }
@@ -1184,13 +1237,14 @@ function Show-JsonOutput {
     if ($script:Results.AutonomousAgent) {
         if ($script:Results.AutonomousAgent.ManualSetupRequired) {
             $output.AutonomousAgent = @{
-                Id = "MANUAL_SETUP_REQUIRED"
+                Id   = "MANUAL_SETUP_REQUIRED"
                 Name = $script:Results.AutonomousAgent.Name
                 Note = "Create autonomous agent identity manually in Azure Portal"
             }
-        } else {
+        }
+        else {
             $output.AutonomousAgent = @{
-                Id = $script:Results.AutonomousAgent.Id
+                Id   = $script:Results.AutonomousAgent.Id
                 Name = $script:Results.AutonomousAgent.Name
             }
         }
@@ -1199,16 +1253,17 @@ function Show-JsonOutput {
     if ($script:Results.AgentUser) {
         if ($script:Results.AgentUser.ManualSetupRequired) {
             $output.AgentUser = @{
-                Id = "MANUAL_SETUP_REQUIRED"
+                Id   = "MANUAL_SETUP_REQUIRED"
                 Name = $script:Results.AgentUser.Name
                 Note = "Create agent user identity manually in Azure Portal"
             }
             if ($script:Results.AgentUser.ServiceAccountUpn) {
                 $output.AgentUser.ServiceAccountUpn = $script:Results.AgentUser.ServiceAccountUpn
             }
-        } else {
+        }
+        else {
             $output.AgentUser = @{
-                Id = $script:Results.AgentUser.Id
+                Id   = $script:Results.AgentUser.Id
                 Name = $script:Results.AgentUser.Name
             }
         }
@@ -1265,13 +1320,15 @@ function Update-ConfigFiles {
         # Update agent identities if available
         if ($script:Results.AutonomousAgent -and -not $script:Results.AutonomousAgent.ManualSetupRequired) {
             $config.AgentIdentities.AgentIdentity = $script:Results.AutonomousAgent.Id
-        } else {
+        }
+        else {
             $config.AgentIdentities.AgentIdentity = "YOUR_AGENT_IDENTITY_ID"
         }
         
         if ($script:Results.AgentUser -and -not $script:Results.AgentUser.ManualSetupRequired) {
             $config.AgentIdentities.AgentUserId = $script:Results.AgentUser.Id
-        } else {
+        }
+        else {
             $config.AgentIdentities.AgentUserId = "YOUR_AGENT_USER_ID"
         }
         
@@ -1293,7 +1350,8 @@ function Update-ConfigFiles {
         if ($script:Results.AgentUser -and $script:Results.AgentUser.ManualSetupRequired) {
             Write-Status "Note: Update AgentUserId field manually after creating the agent user identity" -Type Warning
         }
-    } else {
+    }
+    else {
         Write-Status "Orchestrator config file not found: $orchestratorConfigPath" -Type Warning
     }
     
@@ -1314,7 +1372,8 @@ function Update-ConfigFiles {
             
             $config | ConvertTo-Json -Depth 10 | Set-Content $serviceConfigPath
             Write-Status "Updated successfully" -Type Success
-        } else {
+        }
+        else {
             Write-Status "Service config file not found: $serviceConfigPath" -Type Warning
         }
     }
