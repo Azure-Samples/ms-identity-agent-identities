@@ -5,10 +5,17 @@ Accept: application/json
 Content-Type: application/json
 
 ###
-POST {{AgentOrchestrator_HostAddress}}/api/customerservice?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@msidlabtoint.onmicrosoft.com
+POST {{AgentOrchestrator_HostAddress}}/api/customerservice/process
+Accept: application/json
+Content-Type: application/json
 
-CustomerService
+{
+ "OrderId": "1234",
+ "UserUpn" : "agentuser1@msidlabtoint.onmicrosoft.com",
+ "AgentIdentity": "c11ec083-2fb9-4d75-99d6-422cd312f589"
+}
 
+###
 
 GET {{AgentOrchestrator_HostAddress}}/api/agentidentity
 Accept: application/json
