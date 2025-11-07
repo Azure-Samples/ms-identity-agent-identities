@@ -1,6 +1,8 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Identity.Web;
 using AgentOrchestrator.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Identity.Abstractions;
+using Microsoft.Identity.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +16,29 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddInMemoryTokenCaches();
 
 builder.Services.AddAgentIdentities();
+builder.Services.AddDownstreamApis(builder.Configuration.GetSection("DownstreamApis"));
+
+/*
+ 	"msGraphAgentIdentity": {
+			"BaseUrl": "https://graph.microsoft.com",
+			"RelativePath": "/beta/serviceprincipals/Microsoft.Graph.AgentIdentity",
+			"Scopes": [ "00000003-0000-0000-c000-000000000000/.default" ],
+			"RequestAppToken": true,
+			"ExtraHeaderParameters ": {
+				"OData-Version": "4.0"
+			}
+ */
+builder.Services.Configure<DownstreamApiOptions>("msGraphAgentIdentity", options =>
+{
+	options.BaseUrl = "https://graph.microsoft.com";
+	options.RelativePath = "/beta/serviceprincipals/Microsoft.Graph.AgentIdentity";
+	options.Scopes = [ "00000003-0000-0000-c000-000000000000/.default" ];
+	options.RequestAppToken = true;
+	options.ExtraHeaderParameters = new Dictionary<string, string>
+	{
+		{ "OData-Version", "4.0" }
+	};
+});
 
 // Register orchestration service
 builder.Services.AddSingleton<OrchestrationService>();

@@ -69,7 +69,7 @@ param(
     [string]$TenantId,
     
     [Parameter(Mandatory = $false)]
-    [string]$SampleInstancePrefix = "CustomerService1-",
+    [string]$SampleInstancePrefix = "CustomerService2-",
     
     [Parameter(Mandatory = $false)]
     [ValidateSet('PowerShell', 'Json', 'EnvVars', 'UpdateConfig')]
@@ -182,8 +182,12 @@ function Connect-MicrosoftGraphIfNeeded {
                 # for adding creds
                 'AgentIdentityBlueprint.AddRemoveCreds.All',
 
-                # For inhertitable permissions
-                'AgentIdentityBlueprint.ReadWrite.All'
+                # For inheritable permissions
+                'AgentIdentityBlueprint.ReadWrite.All',
+
+                # For creating agent identities
+                'AgentIdentity.Create.All',
+                'AgentIdUser.ReadWrite.IdentityParentedBy'
             )
             
             if ($TenantIdParam) {
@@ -432,7 +436,7 @@ function Set-InheritablePermissions {
                 inheritableScopes = [PSCustomObject]@{
                     "@odata.type" = "microsoft.graph.enumeratedScopes"
                     scopes        = @($service.Scopes.Name)
-                    kind = "enumerated"
+                    kind          = "enumerated"
                 }
             }
         
@@ -449,8 +453,7 @@ function Set-InheritablePermissions {
         Write-Host "Permissions are now available for inheritance by agent blueprints" -ForegroundColor Green
     }
     catch {
-        Write-Status "Error configuring inheritable permissions: $($_.Exception.Message)" -Type Error
-        throw
+        Write-Status "Error configuring inheritable permissions: $($_.Exception.Message)" -Type Warning
     }
 }
 
@@ -869,6 +872,10 @@ function Invoke-Setup {
                     DisplayName   = $blueprintApp.displayName
                     UsedFallback  = $false
                 }
+
+                 Set-ApiScopes -ApplicationId $blueprintApp.id -AppClientId $blueprintApp.appId -Scopes $blueprintApp.scopes @(
+                @{ Name = "Agent.Access"; DisplayName = "Access agent"; Description = "Access the agent" }
+            )
                 
             }
             catch {
@@ -987,98 +994,116 @@ function Invoke-Setup {
         Write-Host "`n--- Step 6: Granting Admin Consent for Inheritable Permissions ---`n" -ForegroundColor Yellow
         Grant-AdminConsent -ClientAppClientId $script:Results.Orchestrator.ClientId
         
-        # Step 8: Handle Agent Identities (if not skipped)
-        if (-not $SkipAgentIdentities) {
-            Write-Host "`n--- Step 7: Creating Agent Identities ---`n" -ForegroundColor Yellow
-            
-            # Store blueprint information
-            $script:Results.Blueprint = @{
-                Id            = $script:Results.Orchestrator.ClientId
-                Name          = $script:Config.BlueprintName
-                ApplicationId = $script:Results.Orchestrator.ClientId
-            }
-            
-            # Create Autonomous Agent Identity (for OrderService)
-            Write-Host "`n--- Step 8: Creating Autonomous Agent Identity ---`n" -ForegroundColor Yellow
-            Write-Status "This identity will be used for calling OrderService autonomously" -Type Info
-            
-            try {
-                $autonomousAgent = New-AgentIdentity `
-                    -BlueprintAppId $script:Results.Orchestrator.ClientId `
-                    -AgentName $script:Config.AutonomousAgentName `
-                    -Type "Autonomous" `
-                    -CurrentUserId $currentUserId
-                
-                $script:Results.AutonomousAgent = $autonomousAgent
-                
-                if ($autonomousAgent.ManualSetupRequired) {
-                    Write-Status "Agent Identity API not available. Manual setup required." -Type Warning
-                }
-                else {
-                    Write-Status "Autonomous Agent Identity created successfully!" -Type Success
-                }
-            }
-            catch {
-                Write-Status "Could not create Autonomous Agent Identity automatically" -Type Warning
-                $script:Results.AutonomousAgent = @{
-                    Id                  = "MANUAL_SETUP_REQUIRED"
-                    Name                = $script:Config.AutonomousAgentName
-                    Type                = "Autonomous"
-                    Purpose             = "For calling OrderService autonomously"
-                    ManualSetupRequired = $true
-                }
-            }
-            
-            # Create Agent User Identity (for Shipping/EmailService with user context)
-            Write-Host "`n--- Step 9: Creating Agent User Identity ---`n" -ForegroundColor Yellow
-            Write-Status "This identity will be used for calling ShippingService and EmailService with user context" -Type Info
-            
-            if (-not $ServiceAccountUpn) {
-                Write-Status "ServiceAccountUpn not provided. Agent User Identity will need to be created manually." -Type Warning
-                $script:Results.Errors += "ServiceAccountUpn required for Agent User Identity"
-                
-                $script:Results.AgentUser = @{
-                    Id                  = "MANUAL_SETUP_REQUIRED"
-                    Name                = $script:Config.AgentUserName
-                    Type                = "AgentUser"
-                    Purpose             = "For calling ShippingService and EmailService with user context"
-                    ManualSetupRequired = $true
-                }
-            }
-            else {
-                try {
-                    $agentUser = New-AgentIdentity `
-                        -BlueprintAppId $script:Results.Orchestrator.ClientId `
-                        -AgentName $script:Config.AgentUserName `
-                        -Type "AgentUser" `
-                        -CurrentUserId $currentUserId `
-                        -ServiceAccountUpn $ServiceAccountUpn
-                    
-                    $script:Results.AgentUser = $agentUser
-                    
-                    if ($agentUser.ManualSetupRequired) {
-                        Write-Status "Agent Identity API not available. Manual setup required." -Type Warning
-                    }
-                    else {
-                        Write-Status "Agent User Identity created successfully!" -Type Success
-                    }
-                }
-                catch {
-                    Write-Status "Could not create Agent User Identity automatically" -Type Warning
-                    $script:Results.AgentUser = @{
-                        Id                  = "MANUAL_SETUP_REQUIRED"
-                        Name                = $script:Config.AgentUserName
-                        Type                = "AgentUser"
-                        ServiceAccountUpn   = $ServiceAccountUpn
-                        Purpose             = "For calling ShippingService and EmailService with user context"
-                        ManualSetupRequired = $true
-                    }
-                }
-            }
+       
+        # Step 8: Grant the blueprint service principal the 'AgentIdentity.CreateAsManager' role in Microsoft Graph
+        
+        # Get the service principal for Microsoft Graph
+        try {
+            $msGraphAppId = "00000003-0000-0000-c000-000000000000"
+            $msGraphServicePrincipal = Get-MgServicePrincipal -Filter "appId eq '$msGraphAppId'" -Select "id,appId,displayName"
+            $msGraphServicePrincipalId = $msGraphServicePrincipal.Id
+            $appRoleId = "4aa6e624-eee0-40ab-bdd8-f9639038a614"
+
+            New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $blueprintSp.Id `
+                -PrincipalId $blueprintSp.Id `
+                -ResourceId $msGraphServicePrincipalId `
+                -AppRoleId $appRoleId
+
         }
-        else {
-            Write-Status "Skipping Agent Identity creation (use without -SkipAgentIdentities to enable)" -Type Info
+        catch {
+            # Already done
         }
+       
+
+        # # Step 8: Handle Agent Identities (if not skipped)
+        # # Convert the Agent blueprint client secret to a secure credential
+        # $SecureClientSecret = ConvertTo-SecureString $script:Results.Orchestrator.ClientSecret -AsPlainText -Force
+        # $ClientSecretCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $script:Results.Orchestrator.ClientId, $SecureClientSecret
+        
+        # # Connect to Microsoft Graph using the blueprint's credentials (no longer the user running the script)
+        # connect-mggraph -tenantId $script:Results.TenantId -ClientSecretCredential $ClientSecretCredential -ContextScope Process -NoWelcome
+        
+        # if (-not $SkipAgentIdentities) {
+        #     Write-Host "`n--- Step 7: Creating Agent Identities ---`n" -ForegroundColor Yellow
+            
+        #     # Store blueprint information
+        #     $script:Results.Blueprint = @{
+        #         Id            = $script:Results.Orchestrator.ClientId
+        #         Name          = $script:Config.BlueprintName
+        #         ApplicationId = $script:Results.Orchestrator.ClientId
+        #     }
+            
+        #     # Create Autonomous Agent Identity (for OrderService)
+        #     Write-Host "`n--- Step 8: Creating Agent Identity ---`n" -ForegroundColor Yellow
+        #     Write-Status "This identity will be used for calling OrderService" -Type Info
+            
+        #     try {
+        #         $autonomousAgent = New-AgentIdentity `
+        #             -BlueprintAppId $script:Results.Orchestrator.ClientId `
+        #             -AgentName $script:Config.AutonomousAgentName `
+        #             -Type "Autonomous" `
+        #             -CurrentUserId $currentUserId
+                
+        #         $script:Results.AutonomousAgent = $autonomousAgent     
+        #         Write-Status "Autonomous Agent Identity created successfully!" -Type Success
+
+        #     }
+        #     catch {
+        #         Write-Status "Could not create Autonomous Agent Identity automatically" -Type Warning
+        #         $script:Results.AutonomousAgent = @{
+        #             Id                  = "MANUAL_SETUP_REQUIRED"
+        #             Name                = $script:Config.AutonomousAgentName
+        #             Type                = "Autonomous"
+        #             Purpose             = "For calling OrderService autonomously"
+        #             ManualSetupRequired = $true
+        #         }
+        #     }
+            
+        #     # Create Agent User Identity (for Shipping/EmailService with user context)
+        #     Write-Host "`n--- Step 9: Creating Agent User Identity ---`n" -ForegroundColor Yellow
+        #     Write-Status "This identity will be used for calling ShippingService and EmailService with user context" -Type Info
+            
+        #     if (-not $ServiceAccountUpn) {
+        #         Write-Status "ServiceAccountUpn not provided. Agent User Identity will need to be created manually." -Type Warning
+        #         $script:Results.Errors += "ServiceAccountUpn required for Agent User Identity"
+                
+        #         $script:Results.AgentUser = @{
+        #             Id                  = "MANUAL_SETUP_REQUIRED"
+        #             Name                = $script:Config.AgentUserName
+        #             Type                = "AgentUser"
+        #             Purpose             = "For calling ShippingService and EmailService with user context"
+        #             ManualSetupRequired = $true
+        #         }
+        #     }
+        #     else {
+        #         try {
+        #             $agentUser = New-AgentIdentity `
+        #                 -BlueprintAppId $script:Results.Orchestrator.ClientId `
+        #                 -AgentName $script:Config.AgentUserName `
+        #                 -Type "AgentUser" `
+        #                 -CurrentUserId $currentUserId `
+        #                 -ServiceAccountUpn $ServiceAccountUpn
+                    
+        #             $script:Results.AgentUser = $agentUser
+                    
+        #                 Write-Status "Agent User Identity created successfully!" -Type Success
+        #         }
+        #         catch {
+        #             Write-Status "Could not create Agent User Identity automatically" -Type Warning
+        #             $script:Results.AgentUser = @{
+        #                 Id                  = "MANUAL_SETUP_REQUIRED"
+        #                 Name                = $script:Config.AgentUserName
+        #                 Type                = "AgentUser"
+        #                 ServiceAccountUpn   = $ServiceAccountUpn
+        #                 Purpose             = "For calling ShippingService and EmailService with user context"
+        #                 ManualSetupRequired = $true
+        #             }
+        #         }
+        #     }
+        # }
+        # else {
+        #     Write-Status "Skipping Agent Identity creation (use without -SkipAgentIdentities to enable)" -Type Info
+        # }
         
         # Step 10: Output Results
         Write-Host "`n========================================" -ForegroundColor Cyan
@@ -1155,7 +1180,6 @@ function Show-Results {
     }
     
     Write-Status "6. Build and run the solution: dotnet run --project src/CustomerServiceAgent.AppHost" -Type Info
-    Write-Status "" -Type Info
     Write-Status "For detailed setup instructions, see: docs/setup/02-entra-id-setup.md" -Type Info
 }
 
@@ -1175,31 +1199,22 @@ function Show-PowerShellOutput {
         Write-Host "`$$($varName)ClientId = `"$($service.ClientId)`""
     }
     
-    if ($script:Results.Blueprint -and -not $script:Results.Blueprint.ManualSetupRequired) {
+    if ($script:Results.Blueprint) {
         Write-Host ""
         Write-Host "# Agent Identity Blueprint"
         Write-Host "`$BlueprintId = `"$($script:Results.Blueprint.Id)`""
     }
     
-    if ($script:Results.AutonomousAgent -and -not $script:Results.AutonomousAgent.ManualSetupRequired) {
+    if ($script:Results.AutonomousAgent ) {
         Write-Host ""
         Write-Host "# Autonomous Agent Identity"
         Write-Host "`$AutonomousAgentId = `"$($script:Results.AutonomousAgent.Id)`""
     }
     
-    if ($script:Results.AgentUser -and -not $script:Results.AgentUser.ManualSetupRequired) {
+    if ($script:Results.AgentUser) {
         Write-Host ""
         Write-Host "# Agent User Identity"
         Write-Host "`$AgentUserId = `"$($script:Results.AgentUser.Id)`""
-    }
-    
-    if ($script:Results.Blueprint -and $script:Results.Blueprint.ManualSetupRequired) {
-        Write-Host ""
-        Write-Host "# Note: Blueprint and Agent Identities require manual setup in Azure Portal"
-        Write-Host "# After creating them, update your appsettings.json with:"
-        Write-Host "# - Blueprint ID"
-        Write-Host "# - Autonomous Agent Identity ID"
-        Write-Host "# - Agent User Identity ID"
     }
 }
 

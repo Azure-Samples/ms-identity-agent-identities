@@ -1,6 +1,16 @@
 @AgentOrchestrator_HostAddress = http://localhost:5081
 
-GET {{AgentOrchestrator_HostAddress}}/weatherforecast/
+POST {{AgentOrchestrator_HostAddress}}/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@msidlabtoint.onmicrosoft.com
+Accept: application/json
+Content-Type: application/json
+
+###
+POST {{AgentOrchestrator_HostAddress}}/api/customerservice?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@msidlabtoint.onmicrosoft.com
+
+CustomerService
+
+
+GET {{AgentOrchestrator_HostAddress}}/api/agentidentity
 Accept: application/json
 
 ###
