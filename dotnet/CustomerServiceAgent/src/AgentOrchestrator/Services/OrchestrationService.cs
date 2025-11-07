@@ -38,11 +38,11 @@ public class OrchestrationService
 	/// </summary>
 	public async Task<OrderDetails?> GetOrderDetailsAsync(string orderId, string? agentIdentity = null)
 	{
-		var orderServiceConfig = _configuration.GetSection("DownstreamApis:OrderService");
-		var orderServiceUrl = orderServiceConfig["BaseUrl"]
+		var orderServiceConfig = _configuration.GetSection("DownstreamApis:OrderService")
 			?? throw new InvalidOperationException("OrderService URL not configured");
 		var scopes = orderServiceConfig["Scopes:0"]
 			?? throw new InvalidOperationException("OrderService scopes not configured");
+		var orderServiceBaseUrl = _configuration.GetValue<string>("services:orderservice:https:0");
 
 		var agentId = agentIdentity ?? _configuration["AgentIdentities:AgentIdentity"];
 		_logger.LogInformation("Acquiring token for Order Service using agent identity {AgentId}", agentId);
@@ -51,11 +51,12 @@ public class OrchestrationService
 		var authHeader = await _authorizationHeaderProvider.CreateAuthorizationHeaderForAppAsync(scopes,
 			agentIdentity != null ? new AuthorizationHeaderProviderOptions().WithAgentIdentity(agentIdentity) : null);
 
-		var httpClient = _httpClientFactory.CreateClient();
+		var httpClient = _httpClientFactory.CreateClient("orderservice");
+
 		httpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
 		_logger.LogInformation("Calling Order Service GET /api/orders/{OrderId}", orderId);
-		var response = await httpClient.GetAsync($"{orderServiceUrl}/api/orders/{orderId}");
+		var response = await httpClient.GetAsync($"{orderServiceBaseUrl}/api/orders/{orderId}");
 
 		if (response.IsSuccessStatusCode)
 		{
@@ -73,7 +74,7 @@ public class OrchestrationService
 	public async Task<DeliveryInfo?> UpdateDeliveryAsync(string orderId, DeliveryInfo updatedInfo, string userUpn, string? agentIdentity = null)
 	{
 		var shippingServiceConfig = _configuration.GetSection("DownstreamApis:ShippingService");
-		var shippingServiceUrl = shippingServiceConfig["BaseUrl"]
+		var shippingServiceUrl = _configuration.GetValue<string>("services:shippingservice:https:0")
 			?? throw new InvalidOperationException("ShippingService URL not configured");
 		var scopes = shippingServiceConfig.GetSection("Scopes").Get<string[]>()
 			?? throw new InvalidOperationException("ShippingService scopes not configured");
@@ -84,7 +85,7 @@ public class OrchestrationService
 
 		// Acquire token using agent user identity with user context
 		var authHeader = await _authorizationHeaderProvider.CreateAuthorizationHeaderForUserAsync(scopes,
-			new AuthorizationHeaderProviderOptions().WithAgentUserIdentity(agentIdentity, userUpn));
+			agentIdentity != null ? new AuthorizationHeaderProviderOptions().WithAgentUserIdentity(agentIdentity, userUpn) : null);
 
 		var httpClient = _httpClientFactory.CreateClient();
 		httpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);
@@ -119,7 +120,7 @@ public class OrchestrationService
 
 		// Acquire token using agent user identity with user context
 		var authHeader = await _authorizationHeaderProvider.CreateAuthorizationHeaderForUserAsync(scopes,
-			new AuthorizationHeaderProviderOptions().WithAgentUserIdentity(agentUserId, userUpn));
+			agentUserId !=null ? new AuthorizationHeaderProviderOptions().WithAgentUserIdentity(agentUserId, userUpn) : null);
 
 		var httpClient = _httpClientFactory.CreateClient();
 		httpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);

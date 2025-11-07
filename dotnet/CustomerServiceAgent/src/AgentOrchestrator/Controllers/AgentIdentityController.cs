@@ -113,7 +113,7 @@ namespace api.Controllers
 		// Get the list of Agent Identities associated with the current agent application (on behalf of the current user)
 		// GET: api/<AgentIdentity>
 		[HttpGet]
-		public async Task<IEnumerable<AgentIdentity>> Get()
+		public async Task<IEnumerable<AgentIdentity>?> Get()
 		{
 			try
 			{
@@ -121,6 +121,7 @@ namespace api.Controllers
 			}
 			catch (Exception ex)
 			{
+				// Don't do that in production!
 				throw;
 			}
 		}
@@ -129,7 +130,7 @@ namespace api.Controllers
 		// Delete an Agent Identity by ID (on behalf of the agent application)
 		// DELETE api/<AgentIdentity>/5
 		[HttpDelete("{id}")]
-		public async Task<string> Delete(string id)
+		public async Task<string?> Delete(string id)
 		{
 			var result = await DownstreamApi.DeleteForAppAsync<string, object>(
 				"msGraphAgentIdentity",
@@ -138,7 +139,7 @@ namespace api.Controllers
 				  {
 					  options.RelativePath += $"/{id}"; // Specify the ID of the agent identity to delete
 				  });
-			return result!.ToString();
+			return result?.ToString();
 		}
 	}
 }
