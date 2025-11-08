@@ -73,7 +73,7 @@ For each:
 4. Note the **Application (client) ID**
 5. No client secret needed (these are APIs, not clients)
 
-### Step 4: Expose APIs
+### Step 4: Expose APIs and App Roles
 
 For **each downstream service** (Order, Shipping, Email):
 
@@ -100,6 +100,23 @@ Display name: Read order data
 Description: Allows the application to read order information
 ```
 
+### Step 4a: Add App Roles (for autonomous agent access)
+
+For **Order Service only** (required for autonomous agent identity):
+
+1. Go to the Order Service app registration
+2. Select **App roles**
+3. Click **Create app role**
+4. Configure:
+   - **Display name:** `Read all orders`
+   - **Allowed member types:** Applications
+   - **Value:** `Orders.Read.All`
+   - **Description:** `Allows the application to read all order information as an autonomous agent`
+   - **Enable this app role:** Checked
+5. Click **Apply**
+
+> **Note:** App roles are used for app-only (autonomous agent) access, while scopes are used for delegated (user) access. The Order Service supports both patterns through a custom authorization policy.
+
 ---
 
 ## Part 2: Configure API Permissions (10 minutes)
@@ -111,18 +128,25 @@ Description: Allows the application to read order information
 3. Click **Add a permission** → **My APIs**
 4. For each downstream service:
    - Select the service (e.g., `CustomerService-OrderAPI`)
-   - Check **Application permissions** (for autonomous agent)
-   - Select the scopes (e.g., `Orders.Read`)
+   - For **Order Service**:
+     - Check **Application permissions**
+     - Select `Orders.Read.All` (for autonomous agent access)
+   - For **Shipping and Email Services**:
+     - Check **Delegated permissions**
+     - Select the scopes (e.g., `Shipping.Read`, `Shipping.Write`, `Email.Send`)
    - Click **Add permissions**
 5. Repeat for all services
 6. Click **Grant admin consent for [Your Tenant]**
 7. Confirm by clicking **Yes**
 
 **Result:** Orchestrator should have permissions to:
-- `api://customerservice-orders/Orders.Read`
-- `api://customerservice-shipping/Shipping.Read`
-- `api://customerservice-shipping/Shipping.Write`
-- `api://customerservice-email/Email.Send`
+- Application permission: `Orders.Read.All` (app role for Order Service)
+- Delegated permissions:
+  - `api://customerservice-shipping/Shipping.Read`
+  - `api://customerservice-shipping/Shipping.Write`
+  - `api://customerservice-email/Email.Send`
+
+> **Note:** The automated setup script (`Setup-EntraIdApps.ps1`) handles both app role configuration and assignment automatically.
 
 ---
 
@@ -235,19 +259,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAgentIdentities();
 ```
 
-#### Downstream Services (All Controllers)
+#### Downstream Services
 
-Uncomment the `[Authorize]` and `[RequiredScope]` attributes:
+**Order Service** uses a custom authorization policy to support both delegated and application permissions:
 
 ```csharp
-// Before (demo mode):
-// [Authorize] // Commented for demo
-// [RequiredScope("Orders.Read")]
-
-// After (production):
-[Authorize]
-[RequiredScope("Orders.Read")]
+// Order Service supports both app roles and scopes
+[Authorize(Policy = "Orders.Read.Any")]
+[ApiController]
+[Route("api/[controller]")]
+public class OrdersController : ControllerBase
+{
+    // ... controller implementation
+}
 ```
+
+The policy is configured in `Program.cs`:
+
+```csharp
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Orders.Read.Any", policy =>
+        policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim(c => c.Type == "scp" && c.Value.Split(' ').Contains("Orders.Read")) ||
+            ctx.User.HasClaim(c => c.Type == "roles" && c.Value.Split(' ').Contains("Orders.Read.All"))
+        )
+    );
+});
+```
+
+This allows the Order Service to accept:
+- **Delegated permission:** `scp` claim containing `Orders.Read` (user context)
+- **Application permission:** `roles` claim containing `Orders.Read.All` (app-only context)
+
+**Other Services** (Shipping, Email) continue to use `[RequiredScope]` for delegated permissions only.
 
 ---
 
@@ -272,9 +317,15 @@ Uncomment the `[Authorize]` and `[RequiredScope]` attributes:
      -d '{"orderId": "12345", "userUpn": "csr-agent@yourdomain.com"}'
    ```
 
-4. **Check Aspire Dashboard logs** for:
+4. **Verify app role in token:**
+   - Capture the access token used to call Order Service (check logs)
+   - Decode it at https://jwt.ms
+   - Verify the `roles` claim contains `Orders.Read.All`
+
+5. **Check Aspire Dashboard logs** for:
    - Token acquisition from Azure AD
-   - Successful authentication
+   - Successful authentication with app role
+   - Order Service accepting the token
    - No mock token warnings
 
 ---
@@ -284,7 +335,8 @@ Uncomment the `[Authorize]` and `[RequiredScope]` attributes:
 - [ ] All 5 app registrations created
 - [ ] Client secret created for orchestrator
 - [ ] APIs exposed with appropriate scopes
-- [ ] Orchestrator has admin-consented permissions
+- [ ] Order API has `Orders.Read.All` app role defined
+- [ ] Orchestrator has admin-consented permissions (including app role assignment)
 - [ ] Agent Identity Blueprint created
 - [ ] Autonomous agent identity created
 - [ ] Agent user identity created
@@ -292,6 +344,7 @@ Uncomment the `[Authorize]` and `[RequiredScope]` attributes:
 - [ ] Authentication code uncommented
 - [ ] Solution builds successfully
 - [ ] Sample runs with real Azure AD tokens
+- [ ] App role appears in access token for Order Service
 
 ---
 
@@ -307,7 +360,16 @@ Uncomment the `[Authorize]` and `[RequiredScope]` attributes:
 
 ### Error: 401 Unauthorized from downstream service
 - Verify Audience in service appsettings.json
-- Check token in https://jwt.ms - ensure it has correct audience and roles
+- Check token in https://jwt.ms - ensure it has correct audience and roles/scopes
+- For Order Service specifically:
+  - Autonomous agent tokens should have `roles` claim with `Orders.Read.All`
+  - User tokens should have `scp` claim with `Orders.Read`
+
+### Error: Missing app role in token
+- Verify app role `Orders.Read.All` is defined in Order API app registration
+- Ensure orchestrator service principal has the app role assigned
+- Check API permissions blade for the orchestrator - should show granted app role
+- Wait a few minutes for Azure AD to propagate the assignment
 
 ### Error: Agent Identity not found
 - Verify Agent Identity Blueprint is created

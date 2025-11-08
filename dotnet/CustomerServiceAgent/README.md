@@ -9,8 +9,9 @@ A comprehensive sample demonstrating how AI agents securely call downstream serv
 ## 🎯 Overview
 
 This sample illustrates:
-- **Autonomous Agent Identity** (Order API - read operations)
+- **Autonomous Agent Identity** (Order API - read operations with app role-based access control)
 - **Agent User Identities** with user context (Shipping & Email APIs - write operations)  
+- **App Role-Based Authorization** - Order API accepts both delegated permissions (`Orders.Read`) and application permissions (`Orders.Read.All`)
 - **.NET Aspire Dashboard** - Distributed tracing, logs, metrics, and service map
 - **Service Discovery** - Dynamic service resolution via Aspire
 - **In-Memory Stores** - Simple demonstration without external dependencies
@@ -137,14 +138,28 @@ CustomerServiceAgent/
 
 ## 🔑 Key Features
 
-### 1. Autonomous Agent Identity (Read Operations)
+### 1. Autonomous Agent Identity with App Roles (Read Operations)
 ```csharp
-// OrderService uses autonomous agent identity
+// OrderService uses autonomous agent identity with app role-based access
 var authHeader = await _authorizationHeaderProvider
     .CreateAuthorizationHeaderForAppAsync(
         $"api://YOUR_SERVICE_CLIENT_ID/.default",
         new AuthorizationHeaderProviderOptions().WithAgentIdentity(autonomousAgentId)
     );
+```
+
+The Order Service accepts tokens with the `Orders.Read.All` app role:
+```csharp
+// Custom authorization policy accepts both scopes and app roles
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Orders.Read.Any", policy =>
+        policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim(c => c.Type == "scp" && c.Value.Split(' ').Contains("Orders.Read")) ||
+            ctx.User.HasClaim(c => c.Type == "roles" && c.Value.Split(' ').Contains("Orders.Read.All"))
+        )
+    );
+});
 ```
 
 ### 2. Agent User Identity (Write Operations)
