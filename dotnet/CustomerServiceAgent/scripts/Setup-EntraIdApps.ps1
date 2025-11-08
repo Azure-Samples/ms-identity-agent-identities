@@ -98,6 +98,14 @@ $script:Config = @{
             Scopes      = @(
                 @{ Name = "Orders.Read"; DisplayName = "Read order data"; Description = "Allows the application to read order information" }
             )
+            AppRoles    = @(
+                @{
+                    Value       = "Orders.Read.All"
+                    DisplayName = "Read all orders"
+                    Description = "Allows the application to read all order information as an autonomous agent"
+                    Id          = "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d"
+                }
+            )
         },
         @{
             Name        = "ShippingAPI"
@@ -390,6 +398,126 @@ function Set-ApiScopes {
     catch {
         Write-Status "Error configuring API scopes: $($_.Exception.Message)" -Type Error
         throw
+    }
+}
+
+function Ensure-AppRoles {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ApplicationId,
+        
+        [Parameter(Mandatory = $true)]
+        [array]$DesiredAppRoles
+    )
+    
+    Write-Status "Configuring app roles..." -Type Info
+    
+    try {
+        $app = Get-MgApplication -ApplicationId $ApplicationId
+        
+        # Get existing app roles
+        $existingAppRoles = @()
+        if ($app.AppRoles) {
+            $existingAppRoles = $app.AppRoles
+        }
+        
+        # Track if we need to update
+        $needsUpdate = $false
+        $updatedAppRoles = @()
+        
+        # Keep existing app roles
+        foreach ($existingRole in $existingAppRoles) {
+            $updatedAppRoles += $existingRole
+        }
+        
+        # Add new app roles if they don't exist
+        foreach ($desiredRole in $DesiredAppRoles) {
+            # Check if role already exists by value
+            $existing = $existingAppRoles | Where-Object { $_.Value -eq $desiredRole.Value }
+            
+            if ($existing) {
+                Write-Status "App role already exists: $($desiredRole.Value)" -Type Info
+            }
+            else {
+                $newAppRole = @{
+                    Id                  = $desiredRole.Id
+                    AllowedMemberTypes  = @("Application")
+                    Description         = $desiredRole.Description
+                    DisplayName         = $desiredRole.DisplayName
+                    IsEnabled           = $true
+                    Value               = $desiredRole.Value
+                }
+                
+                $updatedAppRoles += $newAppRole
+                $needsUpdate = $true
+                Write-Status "Adding app role: $($desiredRole.Value)" -Type Success
+            }
+        }
+        
+        # Only update if we have new roles to add
+        if ($needsUpdate) {
+            Write-Status "Updating app roles..." -Type Info
+            
+            $appRoleParams = @{
+                AppRoles = $updatedAppRoles
+            }
+            
+            Update-MgApplication -ApplicationId $ApplicationId -BodyParameter $appRoleParams
+            Write-Status "App roles configured successfully" -Type Success
+            Start-Sleep -Seconds 2
+        }
+        else {
+            Write-Status "All required app roles already exist, no update needed" -Type Info
+        }
+    }
+    catch {
+        Write-Status "Error configuring app roles: $($_.Exception.Message)" -Type Error
+        throw
+    }
+}
+
+function Ensure-AppRoleAssignment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PrincipalServicePrincipalId,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$ResourceServicePrincipalId,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$AppRoleId
+    )
+    
+    Write-Status "Assigning app role to service principal..." -Type Info
+    
+    try {
+        # Check if assignment already exists
+        $existingAssignments = Get-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $PrincipalServicePrincipalId -ErrorAction SilentlyContinue
+        
+        $existingAssignment = $existingAssignments | Where-Object {
+            $_.ResourceId -eq $ResourceServicePrincipalId -and $_.AppRoleId -eq $AppRoleId
+        }
+        
+        if ($existingAssignment) {
+            Write-Status "App role assignment already exists" -Type Info
+            return
+        }
+        
+        # Create the app role assignment
+        $appRoleAssignment = @{
+            PrincipalId = $PrincipalServicePrincipalId
+            ResourceId  = $ResourceServicePrincipalId
+            AppRoleId   = $AppRoleId
+        }
+        
+        New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $PrincipalServicePrincipalId -BodyParameter $appRoleAssignment | Out-Null
+        Write-Status "App role assigned successfully" -Type Success
+        Start-Sleep -Seconds 2
+    }
+    catch {
+        Write-Status "Error assigning app role: $($_.Exception.Message)" -Type Error
+        # Non-fatal error, continue
+        $script:Results.Errors += "App role assignment may need to be done manually"
     }
 }
 
@@ -961,11 +1089,17 @@ function Invoke-Setup {
             # Configure API scopes
             Set-ApiScopes -ApplicationId $serviceApp.Id -AppClientId $serviceApp.AppId -Scopes $service.Scopes
             
+            # Configure app roles if defined
+            if ($service.AppRoles -and $service.AppRoles.Count -gt 0) {
+                Ensure-AppRoles -ApplicationId $serviceApp.Id -DesiredAppRoles $service.AppRoles
+            }
+            
             $script:Results.Services[$service.Name] = @{
                 ApplicationId = $serviceApp.Id
                 ClientId      = $serviceApp.AppId
                 DisplayName   = $serviceApp.DisplayName
                 Scopes        = $service.Scopes.Name
+                AppRoles      = if ($service.AppRoles) { $service.AppRoles } else { @() }
             }
             
             Write-Status "Service $($service.DisplayName) configured successfully`n" -Type Success
@@ -993,6 +1127,34 @@ function Invoke-Setup {
         # Step 7: Grant Admin Consent for Inheritable Permissions
         Write-Host "`n--- Step 6: Granting Admin Consent for Inheritable Permissions ---`n" -ForegroundColor Yellow
         Grant-AdminConsent -ClientAppClientId $script:Results.Orchestrator.ClientId
+        
+        # Step 7.5: Assign App Roles to orchestrator service principal
+        Write-Host "`n--- Step 6.5: Assigning App Roles to Orchestrator ---`n" -ForegroundColor Yellow
+        
+        # For each service that has app roles, assign them to the orchestrator
+        foreach ($service in $script:Config.Services) {
+            if ($service.AppRoles -and $service.AppRoles.Count -gt 0) {
+                Write-Status "Assigning app roles from $($service.DisplayName)..." -Type Info
+                
+                $serviceResult = $script:Results.Services[$service.Name]
+                
+                # Get or create service principal for the resource (downstream service)
+                $resourceSp = Get-MgServicePrincipal -Filter "appId eq '$($serviceResult.ClientId)'" -ErrorAction SilentlyContinue
+                if (-not $resourceSp) {
+                    Write-Status "Creating service principal for: $($service.DisplayName)" -Type Info
+                    $resourceSp = New-MgServicePrincipal -AppId $serviceResult.ClientId
+                    Start-Sleep -Seconds 2
+                }
+                
+                # Assign each app role to the orchestrator
+                foreach ($appRole in $service.AppRoles) {
+                    Ensure-AppRoleAssignment `
+                        -PrincipalServicePrincipalId $blueprintSp.Id `
+                        -ResourceServicePrincipalId $resourceSp.Id `
+                        -AppRoleId $appRole.Id
+                }
+            }
+        }
         
        
         # Step 8: Grant the blueprint service principal the 'AgentIdentity.CreateAsManager' role in Microsoft Graph
