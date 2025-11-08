@@ -12,7 +12,7 @@ namespace OrderService.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-[RequiredScope("Orders.Read")]
+//[RequiredScope("Orders.Read")]
 public class OrdersController : ControllerBase
 {
     private readonly OrderStore _orderStore;

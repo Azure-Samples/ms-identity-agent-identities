@@ -2,24 +2,54 @@
 # This script demonstrates common usage patterns
 
 # ============================================
-# Example 1: Basic Interactive Setup
+# Example 1: Basic Interactive Setup with Agent Identities
 # ============================================
-Write-Host "`n=== Example 1: Basic Interactive Setup ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 1: Basic Interactive Setup with Agent Identities ===" -ForegroundColor Cyan
 Write-Host "Connect to your tenant and run the setup script:`n"
 Write-Host "  Connect-MgGraph -Scopes 'Application.ReadWrite.All','Directory.ReadWrite.All','AppRoleAssignment.ReadWrite.All'"
+Write-Host "  .\Setup-EntraIdApps.ps1 -ServiceAccountUpn 'csr-agent@yourdomain.com'`n"
+Write-Host "Note: Creates Agent Identity Blueprint application with inheritable permissions."
+Write-Host "      Provides guidance for manual Agent Identity creation in Azure Portal.`n"
+
+# ============================================
+# Example 2: Skip Agent Identities (for tenants without preview feature)
+# ============================================
+Write-Host "`n=== Example 2: Skip Agent Identities ===" -ForegroundColor Cyan
+Write-Host "For tenants without Agent Identity Blueprints preview feature:`n"
 Write-Host "  .\Setup-EntraIdApps.ps1 -SkipAgentIdentities`n"
 
 # ============================================
-# Example 2: Automated Setup with Config Update
+# Example 3: Automated Setup with Config Update
 # ============================================
-Write-Host "`n=== Example 2: Automated Setup with Config Update ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 3: Automated Setup with Config Update ===" -ForegroundColor Cyan
 Write-Host "Automatically update all appsettings.json files:`n"
-Write-Host "  .\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat UpdateConfig`n"
+Write-Host "  .\Setup-EntraIdApps.ps1 -OutputFormat UpdateConfig`n"
 
 # ============================================
-# Example 3: CI/CD Pipeline Integration
+# Example 4: Create Multiple Instances with Custom Prefix
 # ============================================
-Write-Host "`n=== Example 3: CI/CD Pipeline Integration ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 4: Create Multiple Instances ===" -ForegroundColor Cyan
+Write-Host @"
+# Create development instance
+.\Setup-EntraIdApps.ps1 -SampleInstancePrefix "Dev-" -OutputFormat UpdateConfig
+
+# Create test instance
+.\Setup-EntraIdApps.ps1 -SampleInstancePrefix "Test-" -OutputFormat UpdateConfig
+
+# Create production instance
+.\Setup-EntraIdApps.ps1 -SampleInstancePrefix "Prod-" -OutputFormat UpdateConfig
+
+# Each instance creates isolated app registrations:
+# - Dev-Orchestrator, Dev-OrderAPI, Dev-ShippingAPI, Dev-EmailAPI
+# - Test-Orchestrator, Test-OrderAPI, Test-ShippingAPI, Test-EmailAPI
+# - Prod-Orchestrator, Prod-OrderAPI, Prod-ShippingAPI, Prod-EmailAPI
+
+"@
+
+# ============================================
+# Example 5: CI/CD Pipeline Integration
+# ============================================
+Write-Host "`n=== Example 5: CI/CD Pipeline Integration ===" -ForegroundColor Cyan
 Write-Host @"
 # In your CI/CD pipeline (e.g., GitHub Actions, Azure DevOps)
 
@@ -32,94 +62,92 @@ Write-Host @"
 Connect-MgGraph -TenantId `$tenantId -ClientSecretCredential `$credential
 
 # Run setup and export to file
-.\Setup-EntraIdApps.ps1 -TenantId `$tenantId -OutputFormat Json -SkipAgentIdentities | Out-File config.json
+.\Setup-EntraIdApps.ps1 -TenantId `$tenantId -SampleInstancePrefix "CI-" -OutputFormat Json | Out-File config.json
 
 # Use the configuration
 `$config = Get-Content config.json | ConvertFrom-Json
 Write-Host "Tenant ID: `$(`$config.TenantId)"
-Write-Host "Orchestrator Client ID: `$(`$config.Orchestrator.ClientId)"
+Write-Host "Blueprint Client ID: `$(`$config.Blueprint.ClientId)"
 
 "@
 
 # ============================================
-# Example 4: Export Configuration Only
+# Example 6: Export Configuration Only
 # ============================================
-Write-Host "`n=== Example 4: Export Configuration Only ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 6: Export Configuration Only ===" -ForegroundColor Cyan
 Write-Host @"
 # Export configuration in different formats for documentation
 
 # PowerShell variables (for local dev)
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities > setup-variables.ps1
+.\Setup-EntraIdApps.ps1 > setup-variables.ps1
 
 # JSON format (for tooling)
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat Json > setup-config.json
+.\Setup-EntraIdApps.ps1 -OutputFormat Json > setup-config.json
 
 # Environment variables (for containers)
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat EnvVars > setup-env.ps1
-
-"@
+.\Setup-EntraIdApps.ps1 -OutputFormat EnvVars > setup-env.ps1
 
 # ============================================
-# Example 5: Verify Existing Setup
+# Example 7: Verify Existing Setup (Idempotency)
 # ============================================
-Write-Host "`n=== Example 5: Verify Existing Setup ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 7: Verify Existing Setup ===" -ForegroundColor Cyan
 Write-Host @"
 # Run the script to verify existing configuration (idempotent)
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities
+.\Setup-EntraIdApps.ps1
 
 # The script will:
 # - Find existing applications
 # - Verify they're configured correctly
 # - Output current configuration values
-# - Add a new secret to orchestrator (if needed)
+# - Add a new secret to blueprint (old ones stay valid)
 
 "@
 
 # ============================================
-# Example 6: Specific Tenant Setup
+# Example 8: Specific Tenant Setup
 # ============================================
-Write-Host "`n=== Example 6: Specific Tenant Setup ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 8: Specific Tenant Setup ===" -ForegroundColor Cyan
 Write-Host @"
 # Target a specific tenant
 
 `$tenantId = "your-tenant-id-here"
 
 # Option 1: Let script connect
-.\Setup-EntraIdApps.ps1 -TenantId `$tenantId -SkipAgentIdentities
+.\Setup-EntraIdApps.ps1 -TenantId `$tenantId
 
 # Option 2: Connect first, then run
 Connect-MgGraph -TenantId `$tenantId -Scopes "Application.ReadWrite.All","Directory.ReadWrite.All"
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities
+.\Setup-EntraIdApps.ps1
 
 "@
 
 # ============================================
-# Example 7: Using with Docker Compose
+# Example 9: Using with Docker Compose
 # ============================================
-Write-Host "`n=== Example 7: Using with Docker Compose ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 9: Using with Docker Compose ===" -ForegroundColor Cyan
 Write-Host @"
 # Generate .env file for Docker Compose
 
 # Run setup and export to .env format
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat EnvVars | Out-File .env
+.\Setup-EntraIdApps.ps1 -OutputFormat EnvVars | Out-File .env
 
 # Your docker-compose.yml can now use:
 # environment:
 #   - TENANT_ID=`${TENANT_ID}
-#   - ORCHESTRATOR_CLIENT_ID=`${ORCHESTRATOR_CLIENT_ID}
-#   - ORCHESTRATOR_CLIENT_SECRET=`${ORCHESTRATOR_CLIENT_SECRET}
+#   - BLUEPRINT_CLIENT_ID=`${BLUEPRINT_CLIENT_ID}
+#   - BLUEPRINT_CLIENT_SECRET=`${BLUEPRINT_CLIENT_SECRET}
 
 "@
 
 # ============================================
-# Example 8: Regenerate Secret Only
+# Example 10: Regenerate Secret Only
 # ============================================
-Write-Host "`n=== Example 8: Regenerate Secret Only ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 10: Regenerate Secret Only ===" -ForegroundColor Cyan
 Write-Host @"
-# If you need to rotate/regenerate the orchestrator secret:
+# If you need to rotate/regenerate the blueprint secret:
 
 # Simply re-run the script (idempotent)
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities
+.\Setup-EntraIdApps.ps1
 
 # This will:
 # - Reuse existing applications
@@ -130,30 +158,30 @@ Write-Host @"
 "@
 
 # ============================================
-# Example 9: Capture and Use Output
+# Example 11: Capture and Use Output
 # ============================================
-Write-Host "`n=== Example 9: Capture and Use Output ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 11: Capture and Use Output ===" -ForegroundColor Cyan
 Write-Host @"
 # Capture JSON output and use it in your automation
 
-`$setupOutput = .\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat Json | ConvertFrom-Json
+`$setupOutput = .\Setup-EntraIdApps.ps1 -OutputFormat Json | ConvertFrom-Json
 
 # Access values
 `$tenantId = `$setupOutput.TenantId
-`$orchestratorClientId = `$setupOutput.Orchestrator.ClientId
-`$orchestratorSecret = `$setupOutput.Orchestrator.ClientSecret
+`$blueprintClientId = `$setupOutput.Blueprint.ClientId
+`$blueprintSecret = `$setupOutput.Blueprint.ClientSecret
 `$orderClientId = `$setupOutput.Services.OrderAPI.ClientId
 
 # Use in your application
 Write-Host "Tenant: `$tenantId"
-Write-Host "Orchestrator: `$orchestratorClientId"
+Write-Host "Blueprint: `$blueprintClientId"
 
 # Or save to custom config file
 `$customConfig = @{
     Azure = @{
         TenantId = `$tenantId
-        ClientId = `$orchestratorClientId
-        ClientSecret = `$orchestratorSecret
+        ClientId = `$blueprintClientId
+        ClientSecret = `$blueprintSecret
     }
 }
 `$customConfig | ConvertTo-Json -Depth 10 | Out-File custom-config.json
@@ -161,20 +189,24 @@ Write-Host "Orchestrator: `$orchestratorClientId"
 "@
 
 # ============================================
-# Example 10: Full Setup with Agent Identities
+# Example 12: Full Setup with Agent Identities
 # ============================================
-Write-Host "`n=== Example 10: Full Setup with Agent Identities ===" -ForegroundColor Cyan
+Write-Host "`n=== Example 12: Full Setup with Agent Identities ===" -ForegroundColor Cyan
 Write-Host @"
 # If your tenant has Agent Identities preview feature:
 
-# Run without SkipAgentIdentities flag
+# Provide service account UPN for agent user identity
 .\Setup-EntraIdApps.ps1 -ServiceAccountUpn "csr-agent@yourdomain.com"
 
-# Note: Currently, Agent Identity API may not be available via PowerShell
-# The script will guide you to create them manually in Azure Portal
-# and output the configuration structure for you to fill in
+# The script will:
+# - Create Agent Identity Blueprint application
+# - Configure inheritable permissions to downstream APIs
+# - Provide detailed guidance for creating:
+#   * Agent Identity Blueprint in Azure Portal
+#   * Autonomous Agent Identity (for OrderService)
+#   * Agent User Identity (for Shipping/EmailService)
+# - Output configuration structure for manual completion
 
-"@
 
 Write-Host "`n=== End of Examples ===" -ForegroundColor Cyan
 Write-Host "`nFor more information, see README.md`n" -ForegroundColor Gray

@@ -4,31 +4,41 @@
 
 ```powershell
 # Most common: Interactive setup with config file updates
+.\Setup-EntraIdApps.ps1 -OutputFormat UpdateConfig
+
+# Skip agent identities (for tenants without preview feature)
 .\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat UpdateConfig
 
+# Create with custom prefix (for multiple instances)
+.\Setup-EntraIdApps.ps1 -SampleInstancePrefix "Demo-" -OutputFormat UpdateConfig
+
 # Get PowerShell variables (default)
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities
+.\Setup-EntraIdApps.ps1
 
 # Get JSON output
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat Json
+.\Setup-EntraIdApps.ps1 -OutputFormat Json
 
 # Get environment variables
-.\Setup-EntraIdApps.ps1 -SkipAgentIdentities -OutputFormat EnvVars
+.\Setup-EntraIdApps.ps1 -OutputFormat EnvVars
 ```
 
 ## What Gets Created
 
 | Resource | Name | Description |
 |----------|------|-------------|
-| **Orchestrator App** | CustomerService-Orchestrator | Main application with client secret |
+| **Blueprint App** | CustomerService-Orchestrator | Agent Identity Blueprint with client secret and inheritable permissions |
 | **Order API** | CustomerService-OrderAPI | Exposes `Orders.Read` scope |
-| **CRM API** | CustomerService-CrmAPI | Exposes `CRM.Read` scope |
 | **Shipping API** | CustomerService-ShippingAPI | Exposes `Shipping.Read`, `Shipping.Write` scopes |
 | **Email API** | CustomerService-EmailAPI | Exposes `Email.Send` scope |
+| **Autonomous Agent** | CustomerService-AutonomousAgent | Manual setup in Azure Portal (for OrderService) |
+| **Agent User** | CustomerService-AgentUser | Manual setup in Azure Portal (for Shipping/Email with user context) |
+
+Note: With custom prefix (e.g., `-SampleInstancePrefix "Demo-"`), all resources are prefixed accordingly.
 
 ## Time Required
 
-- **First run**: ~25 minutes
+- **Automated setup**: ~25 minutes
+- **Manual blueprint/identities**: ~10-15 minutes (Azure Portal)
 - **Subsequent runs** (idempotent): ~5 minutes
 
 ## Prerequisites Checklist
@@ -66,12 +76,15 @@
 ## Verification Commands
 
 ```powershell
-# Check apps were created
+# Check apps were created (default prefix)
 Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
 
-# Check orchestrator permissions
-$orchestrator = Get-MgApplication -Filter "displayName eq 'CustomerService-Orchestrator'"
-$orchestrator.RequiredResourceAccess
+# Check apps with custom prefix
+Get-MgApplication -Filter "startswith(displayName, 'Demo-')"
+
+# Check blueprint app permissions (inheritable permissions)
+$blueprint = Get-MgApplication -Filter "displayName eq 'CustomerService-Orchestrator'"
+$blueprint.RequiredResourceAccess
 
 # Check service scopes
 $orderService = Get-MgApplication -Filter "displayName eq 'CustomerService-OrderAPI'"
@@ -81,9 +94,10 @@ $orderService.Api.Oauth2PermissionScopes
 ## Next Steps After Running Script
 
 1. ✅ **Review output** - Verify all client IDs were generated
-2. ✅ **Update configs** - If not using `-OutputFormat UpdateConfig`, manually update appsettings.json files
-3. ✅ **Create Agent Identities** - Follow manual steps in [02-entra-id-setup.md](../docs/setup/02-entra-id-setup.md) Part 3
-4. ✅ **Test the app** - Run `dotnet run --project src/CustomerServiceAgent.AppHost`
+2. ✅ **Create Agent Identity Blueprint** - Follow guidance in script output or [02-entra-id-setup.md](../docs/setup/02-entra-id-setup.md)
+3. ✅ **Create Agent Identities** - Create autonomous agent and agent user in Azure Portal
+4. ✅ **Update configs** - If not using `-OutputFormat UpdateConfig`, manually update appsettings.json files with agent identity IDs
+5. ✅ **Test the app** - Run `dotnet run --project src/CustomerServiceAgent.AppHost`
 
 ## Security Reminders
 
@@ -109,5 +123,5 @@ Having issues? Check:
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-10-15
+**Version**: 2.0.0  
+**Last Updated**: 2025-11-04

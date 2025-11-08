@@ -83,17 +83,17 @@ Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
 ```
 
 **Expected Results**:
-- ✅ 5 applications created:
-  - CustomerService-Orchestrator
+- ✅ 4 applications created:
+  - CustomerService-Orchestrator (blueprint application)
   - CustomerService-OrderAPI
-  - CustomerService-CrmAPI
   - CustomerService-ShippingAPI
   - CustomerService-EmailAPI
 - ✅ Each service has correct scopes configured
-- ✅ Orchestrator has client secret
-- ✅ Orchestrator has permissions to all services
+- ✅ Blueprint has client secret
+- ✅ Blueprint has inheritable permissions to all downstream services
 - ✅ Admin consent granted
 - ✅ Configuration values displayed
+- ✅ Guidance provided for manual Agent Identity Blueprint and agent identity creation
 
 **Verification Commands**:
 ```powershell

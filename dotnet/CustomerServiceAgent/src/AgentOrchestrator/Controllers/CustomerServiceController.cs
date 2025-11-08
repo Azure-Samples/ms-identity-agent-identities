@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using AgentOrchestrator.Services;
 using Shared.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AgentOrchestrator.Controllers;
 
@@ -8,6 +9,7 @@ namespace AgentOrchestrator.Controllers;
 /// Customer Service orchestration controller
 /// Demonstrates how agents securely call downstream services using Agent Identities
 /// </summary>
+// [Authorize] // commented to allow easy testing of the sample; enable in production
 [ApiController]
 [Route("api/[controller]")]
 public class CustomerServiceController : ControllerBase
