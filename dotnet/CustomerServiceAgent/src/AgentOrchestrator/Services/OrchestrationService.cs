@@ -109,7 +109,7 @@ public class OrchestrationService
 	public async Task<bool> SendEmailAsync(EmailRequest emailRequest, string userUpn, string? agentIdentity = null)
 	{
 		var emailServiceConfig = _configuration.GetSection("DownstreamApis:EmailService");
-		var emailServiceUrl = emailServiceConfig["BaseUrl"]
+		var emailServiceUrl = _configuration.GetValue<string>("services:emailservice:https:0")
 			?? throw new InvalidOperationException("EmailService URL not configured");
 		var scopes = emailServiceConfig.GetSection("Scopes").Get<string[]>()
 			?? throw new InvalidOperationException("EmailService scopes not configured");
