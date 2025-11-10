@@ -148,18 +148,15 @@ var authHeader = await _authorizationHeaderProvider
     );
 ```
 
-The Order Service accepts tokens with the `Orders.Read.All` app role:
+The Order Service uses `RequiredScopeOrAppPermission` attribute to accept both scopes and app roles:
 ```csharp
-// Custom authorization policy accepts both scopes and app roles
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("Orders.Read.Any", policy =>
-        policy.RequireAssertion(ctx =>
-            ctx.User.HasClaim(c => c.Type == "scp" && c.Value.Split(' ').Contains("Orders.Read")) ||
-            ctx.User.HasClaim(c => c.Type == "roles" && c.Value.Split(' ').Contains("Orders.Read.All"))
-        )
-    );
-});
+// Accepts both delegated permissions (scopes) and application permissions (app roles)
+[Authorize]
+[RequiredScopeOrAppPermission(
+    AcceptedScope = new[] { "Orders.Read" },
+    AcceptedAppPermission = new[] { "Orders.Read.All" }
+)]
+public class OrdersController : ControllerBase
 ```
 
 ### 2. Agent User Identity (Write Operations)

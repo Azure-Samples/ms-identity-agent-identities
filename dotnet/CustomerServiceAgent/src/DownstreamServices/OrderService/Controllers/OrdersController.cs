@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Web.Resource;
 using OrderService.Services;
 using Shared.Models;
 
@@ -8,9 +9,13 @@ namespace OrderService.Controllers;
 /// <summary>
 /// Order API controller - requires authentication with autonomous agent identity
 /// </summary>
-[Authorize(Policy = "Orders.Read.Any")]
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[RequiredScopeOrAppPermission(
+    AcceptedScope = new[] { "Orders.Read" },
+    AcceptedAppPermission = new[] { "Orders.Read.All" }
+)]
 public class OrdersController : ControllerBase
 {
     private readonly OrderStore _orderStore;

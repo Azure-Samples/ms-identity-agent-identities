@@ -261,31 +261,21 @@ builder.Services.AddAgentIdentities();
 
 #### Downstream Services
 
-**Order Service** uses a custom authorization policy to support both delegated and application permissions:
+**Order Service** uses the `RequiredScopeOrAppPermission` attribute from Microsoft.Identity.Web to support both delegated and application permissions:
 
 ```csharp
 // Order Service supports both app roles and scopes
-[Authorize(Policy = "Orders.Read.Any")]
+[Authorize]
+[RequiredScopeOrAppPermission(
+    AcceptedScope = new[] { "Orders.Read" },
+    AcceptedAppPermission = new[] { "Orders.Read.All" }
+)]
 [ApiController]
 [Route("api/[controller]")]
 public class OrdersController : ControllerBase
 {
     // ... controller implementation
 }
-```
-
-The policy is configured in `Program.cs`:
-
-```csharp
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("Orders.Read.Any", policy =>
-        policy.RequireAssertion(ctx =>
-            ctx.User.HasClaim(c => c.Type == "scp" && c.Value.Split(' ').Contains("Orders.Read")) ||
-            ctx.User.HasClaim(c => c.Type == "roles" && c.Value.Split(' ').Contains("Orders.Read.All"))
-        )
-    );
-});
 ```
 
 This allows the Order Service to accept:
