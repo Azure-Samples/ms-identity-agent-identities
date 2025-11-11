@@ -1,6 +1,9 @@
 @AgentOrchestrator_HostAddress = http://localhost:5081
+@TenantName=msidlabtoint.onmicrosoft.com
+@AgentIdentity=RESULT_FROM_FIRST_REQUEST
+@AgentUserName=agentuser1
 
-POST {{AgentOrchestrator_HostAddress}}/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@msidlabtoint.onmicrosoft.com
+POST {{AgentOrchestrator_HostAddress}}/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn={{AgentUserName}}@{{TenantName}}
 Accept: application/json
 Content-Type: application/json
 
@@ -11,13 +14,8 @@ Content-Type: application/json
 
 {
  "OrderId": "12345",
- "UserUpn" : "agentuser1@msidlabtoint.onmicrosoft.com",
- "AgentIdentity": "c11ec083-2fb9-4d75-99d6-422cd312f589"
+ "UserUpn" : "{{AgentUserName}}@{{TenantName}}",
+ "AgentIdentity": "{{AgentIdentity}}"
 }
-
-###
-
-GET {{AgentOrchestrator_HostAddress}}/api/agentidentity
-Accept: application/json
 
 ###

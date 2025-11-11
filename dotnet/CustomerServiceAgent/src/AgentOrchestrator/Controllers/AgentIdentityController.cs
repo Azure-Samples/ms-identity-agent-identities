@@ -18,6 +18,7 @@ namespace api.Controllers
 		private string sponsorUserId;
 		private readonly IAuthorizationHeaderProvider authorizationHeaderProvider;
 		private List<string> scopesToRequest;
+		private List<string> rolesToRequest;
 		private string tenantId;
 		public IDownstreamApi DownstreamApi { get; }
 
@@ -33,6 +34,7 @@ namespace api.Controllers
 			Dictionary<string, DownstreamApiOptions> downstreamApiOptions = new();
 			configuration.GetSection("DownstreamApis").Bind(downstreamApiOptions);
 			scopesToRequest = new();
+			rolesToRequest = new();
 			foreach(var option in downstreamApiOptions)
 			{
 				string? scopes = option.Value.Scopes?.FirstOrDefault();
@@ -45,6 +47,7 @@ namespace api.Controllers
 					default:
 					case "OrderService":
 						scopesToRequest.Add(scopes.Replace(".default", "Orders.Read"));
+						rolesToRequest.Add(scopes.Replace(".default", "Orders.Read.All"));
 						break;
 					case "ShippingService":
 						scopesToRequest.Add(scopes.Replace(".default", "Shipping.Read"));
@@ -82,7 +85,8 @@ namespace api.Controllers
 
 			// Create a user agent identity if a UPN is provided
 			AgentUserIdentity? newAgentUserId = null;
-			string adminConsentUrl = string.Empty;
+			string adminConsentUrlScopes = string.Empty;
+			string adminConsentUrlRoles = string.Empty;
 			if (!string.IsNullOrEmpty(agentUserIdentityUpn))
 			{
 				// Call the downstream API (canary Graph) with a POST request to create an Agent Identity
@@ -101,11 +105,11 @@ namespace api.Controllers
 						   options.RelativePath = "/beta/users";
 					   });
 
-
-				adminConsentUrl = $"https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent?client_id={newAgentIdentity.id}&scope={string.Join("%20", scopesToRequest)}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
+				adminConsentUrlScopes = $"https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent?client_id={newAgentIdentity.id}&scope={string.Join("%20", scopesToRequest)}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
+				adminConsentUrlRoles = $"https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent?client_id={newAgentIdentity.id}&role={string.Join("%20", rolesToRequest)}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
 			}
 
-			return Ok(new {AgentIdentity=newAgentIdentity, AgentUserIdentity = newAgentUserId, AdminConsentUrl = adminConsentUrl});
+			return Ok(new {AgentIdentity=newAgentIdentity, AgentUserIdentity = newAgentUserId, AdminConsentUrlScopes = adminConsentUrlScopes, AdminConsentUrlRoles = adminConsentUrlRoles });
 		}
 
 
