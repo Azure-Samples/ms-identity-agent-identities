@@ -62,9 +62,21 @@ namespace api.Controllers
 		}
 
 		/// <summary>
-		/// Create a new Agent Identity with the specified name (for the current Agent Application).
-		/// Optionally create a new agent user identity.
+		/// Creates a new Agent Identity with the specified name for the current Agent Application.
+		/// Optionally creates a new agent user identity if a UPN is provided.
 		/// </summary>
+		/// <param name="agentIdentityName">The display name for the new agent identity.</param>
+		/// <param name="agentUserIdentityUpn">Optional user principal name (UPN) to create an agent user identity.</param>
+		/// <returns>
+		/// An object containing:
+		/// - AgentIdentity: The newly created agent identity
+		/// - AgentUserIdentity: The newly created agent user identity (if agentUserIdentityUpn was provided)
+		/// - AdminConsentUrlScopes: URL for admin consent with scope permissions (if agent user identity was created)
+		/// - AdminConsentUrlRoles: URL for admin consent with role permissions (if agent user identity was created)
+		/// </returns>
+		/// <response code="200">Agent identity successfully created.</response>
+		/// <response code="400">Invalid request parameters.</response>
+		/// <response code="500">Internal server error during agent identity creation.</response>
 		[HttpPost]
 		public async Task<IActionResult> Post([FromQuery] string agentIdentityName, [FromQuery] string? agentUserIdentityUpn = null)
 		{
@@ -105,8 +117,8 @@ namespace api.Controllers
 						   options.RelativePath = "/beta/users";
 					   });
 
-				adminConsentUrlScopes = $"https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent?client_id={newAgentIdentity.id}&scope={string.Join("%20", scopesToRequest)}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
-				adminConsentUrlRoles = $"https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent?client_id={newAgentIdentity.id}&role={string.Join("%20", rolesToRequest)}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
+				adminConsentUrlScopes = $"https://login.microsoftonline.com/{Uri.EscapeDataString(tenantId)}/v2.0/adminconsent?client_id={Uri.EscapeDataString(newAgentIdentity.id!)}&scope={string.Join("%20", scopesToRequest.Select(Uri.EscapeDataString))}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
+				adminConsentUrlRoles = $"https://login.microsoftonline.com/{Uri.EscapeDataString(tenantId)}/v2.0/adminconsent?client_id={Uri.EscapeDataString(newAgentIdentity.id!)}&role={string.Join("%20", rolesToRequest.Select(Uri.EscapeDataString))}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
 			}
 
 			return Ok(new {AgentIdentity=newAgentIdentity, AgentUserIdentity = newAgentUserId, AdminConsentUrlScopes = adminConsentUrlScopes, AdminConsentUrlRoles = adminConsentUrlRoles });
@@ -114,8 +126,12 @@ namespace api.Controllers
 
 
 
-		// Get the list of Agent Identities associated with the current agent application (on behalf of the current user)
-		// GET: api/<AgentIdentity>
+		/// <summary>
+		/// Retrieves the list of Agent Identities associated with the current agent application.
+		/// </summary>
+		/// <returns>A collection of agent identities associated with the current application.</returns>
+		/// <response code="200">Successfully retrieved the list of agent identities.</response>
+		/// <response code="500">Internal server error while retrieving agent identities.</response>
 		[HttpGet]
 		public async Task<IEnumerable<AgentIdentity>?> Get()
 		{
@@ -131,8 +147,14 @@ namespace api.Controllers
 		}
 
 
-		// Delete an Agent Identity by ID (on behalf of the agent application)
-		// DELETE api/<AgentIdentity>/5
+		/// <summary>
+		/// Deletes an Agent Identity by its unique identifier.
+		/// </summary>
+		/// <param name="id">The unique identifier of the agent identity to delete.</param>
+		/// <returns>A string representation of the deletion result.</returns>
+		/// <response code="200">Agent identity successfully deleted.</response>
+		/// <response code="404">Agent identity with the specified ID not found.</response>
+		/// <response code="500">Internal server error during deletion.</response>
 		[HttpDelete("{id}")]
 		public async Task<string?> Delete(string id)
 		{
@@ -141,7 +163,7 @@ namespace api.Controllers
 				input: null!,
 			  	options =>
 				  {
-					  options.RelativePath += $"/{id}"; // Specify the ID of the agent identity to delete
+					  options.RelativePath += $"/{Uri.EscapeDataString(id)}"; // Specify the ID of the agent identity to delete
 				  });
 			return result?.ToString();
 		}
