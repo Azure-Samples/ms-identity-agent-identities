@@ -21,6 +21,10 @@ private List<string> scopesToRequest;
 private string tenantId;
 public IDownstreamApi DownstreamApi { get; }
 
+// Compiled regex for better performance when sanitizing log inputs
+private static readonly System.Text.RegularExpressions.Regex LogSanitizationRegex = 
+new(@"[\r\n\t\x00-\x1F\x7F]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
 
 public AgentIdentityController(IConfiguration configuration, IDownstreamApi downstreamApi, IAuthorizationHeaderProvider authorizationHeaderProvider)
 {
@@ -67,7 +71,7 @@ private static string SanitizeForLog(string? input)
         return string.Empty;
     
     // Remove newlines, carriage returns, and other control characters that could be used for log forging
-    return System.Text.RegularExpressions.Regex.Replace(input, @"[\r\n\t\x00-\x1F\x7F]", "_");
+    return LogSanitizationRegex.Replace(input, "_");
 }
 
 /// <summary>

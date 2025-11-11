@@ -1560,7 +1560,8 @@ function Update-ConfigFiles {
         $config = Get-Content $orchestratorConfigPath -Raw | ConvertFrom-Json
         $config.AzureAd.TenantId = $script:Results.TenantId
         $config.AzureAd.ClientId = $script:Results.Orchestrator.ClientId
-        $config.AzureAd.ClientCredentials[0].ClientSecret = $script:Results.Orchestrator.ClientSecret
+        # Note: ClientSecret is NOT set in appsettings.json for security reasons
+        # It should be stored in User Secrets (development) or Azure Key Vault (production)
         
         # Update agent identities if available
         if ($script:Results.AutonomousAgent -and -not $script:Results.AutonomousAgent.ManualSetupRequired) {
@@ -1588,6 +1589,14 @@ function Update-ConfigFiles {
         
         $config | ConvertTo-Json -Depth 10 | Set-Content $orchestratorConfigPath
         Write-Status "Updated successfully" -Type Success
+        
+        # Important: Instruct user to set the client secret using User Secrets
+        Write-Status "`nIMPORTANT: Client secret must be configured separately for security:" -Type Warning
+        Write-Status "For development, use User Secrets:" -Type Info
+        Write-Status "  cd src\AgentOrchestrator" -Type Info
+        Write-Status "  dotnet user-secrets set `"AzureAd:ClientCredentials:0:ClientSecret`" `"$($script:Results.Orchestrator.ClientSecret)`"" -Type Info
+        Write-Status "For production, use Azure Key Vault or environment variables" -Type Info
+        Write-Status "See SECRETS-MANAGEMENT.md for detailed instructions`n" -Type Info
         
         if ($script:Results.AutonomousAgent -and $script:Results.AutonomousAgent.ManualSetupRequired) {
             Write-Status "Note: Update AgentIdentity field manually after creating the autonomous agent identity" -Type Warning
