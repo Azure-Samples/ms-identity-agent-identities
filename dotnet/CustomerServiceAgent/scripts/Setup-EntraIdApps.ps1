@@ -417,7 +417,7 @@ function Ensure-AppRoles {
         
         # Get existing app roles
         $existingAppRoles = @()
-        if ($app.AppRoles) {
+        if ($app.PSObject.Properties['AppRoles']) {
             $existingAppRoles = $app.AppRoles
         }
         
@@ -1090,7 +1090,7 @@ function Invoke-Setup {
             Set-ApiScopes -ApplicationId $serviceApp.Id -AppClientId $serviceApp.AppId -Scopes $service.Scopes
             
             # Configure app roles if defined
-            if ($service.AppRoles -and $service.AppRoles.Count -gt 0) {
+            if ($service.PSObject.Properties['AppRoles'] -and $service.AppRoles.Count -gt 0) {
                 Ensure-AppRoles -ApplicationId $serviceApp.Id -DesiredAppRoles $service.AppRoles
             }
             
@@ -1099,7 +1099,7 @@ function Invoke-Setup {
                 ClientId      = $serviceApp.AppId
                 DisplayName   = $serviceApp.DisplayName
                 Scopes        = $service.Scopes.Name
-                AppRoles      = if ($service.AppRoles) { $service.AppRoles } else { @() }
+                AppRoles      = if ($service.PSObject.Properties['AppRoles']) { $service.AppRoles } else { @() }
             }
             
             Write-Status "Service $($service.DisplayName) configured successfully`n" -Type Success
@@ -1133,7 +1133,7 @@ function Invoke-Setup {
         
         # For each service that has app roles, assign them to the orchestrator
         foreach ($service in $script:Config.Services) {
-            if ($service.AppRoles -and $service.AppRoles.Count -gt 0) {
+            if ($service.PSObject.Properties['AppRoles'] -and $service.AppRoles.Count -gt 0) {
                 Write-Status "Assigning app roles from $($service.DisplayName)..." -Type Info
                 
                 $serviceResult = $script:Results.Services[$service.Name]
