@@ -1590,11 +1590,41 @@ function Update-ConfigFiles {
         $config | ConvertTo-Json -Depth 10 | Set-Content $orchestratorConfigPath
         Write-Status "Updated successfully" -Type Success
         
-        # Important: Instruct user to set the client secret using User Secrets
-        Write-Status "`nIMPORTANT: Client secret must be configured separately for security:" -Type Warning
-        Write-Status "For development, use User Secrets:" -Type Info
-        Write-Status "  cd src\AgentOrchestrator" -Type Info
-        Write-Status "  dotnet user-secrets set `"AzureAd:ClientCredentials:0:ClientSecret`" `"$($script:Results.Orchestrator.ClientSecret)`"" -Type Info
+        # Automatically set the client secret using User Secrets for development
+        Write-Status "`nConfiguring client secret using User Secrets..." -Type Info
+        
+        $orchestratorProjectPath = Join-Path $projectRoot "src\AgentOrchestrator"
+        try {
+            Push-Location $orchestratorProjectPath
+            
+            # Initialize user secrets if not already done
+            $userSecretsOutput = dotnet user-secrets list 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Status "Initializing user secrets for AgentOrchestrator project..." -Type Info
+                dotnet user-secrets init
+            }
+            
+            # Set the client secret
+            $secretKey = "AzureAd:ClientCredentials:0:ClientSecret"
+            $secretValue = $script:Results.Orchestrator.ClientSecret
+            dotnet user-secrets set $secretKey $secretValue
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Status "Successfully configured client secret in User Secrets" -Type Success
+                Write-Status "The secret is stored securely outside of source control" -Type Info
+            } else {
+                throw "dotnet user-secrets command failed"
+            }
+        }
+        catch {
+            Write-Status "Could not automatically set User Secret. Please set it manually:" -Type Warning
+            Write-Status "  cd src\AgentOrchestrator" -Type Info
+            Write-Status "  dotnet user-secrets set `"AzureAd:ClientCredentials:0:ClientSecret`" `"$($script:Results.Orchestrator.ClientSecret)`"" -Type Info
+        }
+        finally {
+            Pop-Location
+        }
+        
         Write-Status "For production, use Azure Key Vault or environment variables" -Type Info
         Write-Status "See SECRETS-MANAGEMENT.md for detailed instructions`n" -Type Info
         
