@@ -65,7 +65,7 @@ namespace api.Controllers
 		/// Create a new Agent Identity with the specified name (for the current Agent Application).
 		/// Optionally create a new agent user identity.
 		/// </summary>
-		/// <param name="agentIdentityName">The display name for the new agent identity. This is required.</param>
+		/// <param name="agentIdentityName">The app registration name for the new agent identity. This is required.</param>
 		/// <param name="agentUserIdentityUpn">Optional user principal name (UPN) for creating an agent user identity associated with the agent identity. If provided, an agent user identity will be created.</param>
 		/// <returns>
 		/// An object containing:
