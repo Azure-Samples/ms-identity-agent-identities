@@ -38,13 +38,34 @@ public class OrchestrationService
 	/// </summary>
 	public async Task<OrderDetails?> GetOrderDetailsAsync(string orderId, string? agentIdentity = null)
 	{
-		var orderServiceConfig = _configuration.GetSection("DownstreamApis:OrderService")
-			?? throw new InvalidOperationException("OrderService URL not configured");
-		var scopes = orderServiceConfig["Scopes:0"]
-			?? throw new InvalidOperationException("OrderService scopes not configured");
+		var orderServiceConfig = _configuration.GetSection("DownstreamApis:OrderService");
+		if (!orderServiceConfig.Exists())
+		{
+			_logger.LogError("OrderService configuration section not found in appsettings");
+			throw new InvalidOperationException("OrderService configuration is missing. Please ensure 'DownstreamApis:OrderService' is configured in appsettings.json.");
+		}
+
+		var scopes = orderServiceConfig["Scopes:0"];
+		if (string.IsNullOrEmpty(scopes))
+		{
+			_logger.LogError("OrderService scopes not configured");
+			throw new InvalidOperationException("OrderService scopes are missing. Please ensure 'DownstreamApis:OrderService:Scopes' is configured in appsettings.json.");
+		}
+
 		var orderServiceBaseUrl = _configuration.GetValue<string>("services:orderservice:https:0");
+		if (string.IsNullOrEmpty(orderServiceBaseUrl))
+		{
+			_logger.LogError("OrderService URL not configured");
+			throw new InvalidOperationException("OrderService URL is missing. This value is typically provided by Aspire service discovery. Ensure the service is configured correctly.");
+		}
 
 		var agentId = agentIdentity ?? _configuration["AgentIdentities:AgentIdentity"];
+		if (string.IsNullOrEmpty(agentId))
+		{
+			_logger.LogError("Agent identity not provided and not configured");
+			throw new InvalidOperationException("Agent identity is required. Please provide an agentIdentity parameter or configure 'AgentIdentities:AgentIdentity' in appsettings.json.");
+		}
+
 		_logger.LogInformation("Acquiring token for Order Service using agent identity {AgentId}", agentId);
 
 		// Acquire token using agent identity
@@ -74,12 +95,39 @@ public class OrchestrationService
 	public async Task<DeliveryInfo?> UpdateDeliveryAsync(string orderId, DeliveryInfo updatedInfo, string userUpn, string? agentIdentity = null)
 	{
 		var shippingServiceConfig = _configuration.GetSection("DownstreamApis:ShippingService");
-		var shippingServiceUrl = _configuration.GetValue<string>("services:shippingservice:https:0")
-			?? throw new InvalidOperationException("ShippingService URL not configured");
-		var scopes = shippingServiceConfig.GetSection("Scopes").Get<string[]>()
-			?? throw new InvalidOperationException("ShippingService scopes not configured");
+		if (!shippingServiceConfig.Exists())
+		{
+			_logger.LogError("ShippingService configuration section not found in appsettings");
+			throw new InvalidOperationException("ShippingService configuration is missing. Please ensure 'DownstreamApis:ShippingService' is configured in appsettings.json.");
+		}
+
+		var shippingServiceUrl = _configuration.GetValue<string>("services:shippingservice:https:0");
+		if (string.IsNullOrEmpty(shippingServiceUrl))
+		{
+			_logger.LogError("ShippingService URL not configured");
+			throw new InvalidOperationException("ShippingService URL is missing. This value is typically provided by Aspire service discovery. Ensure the service is configured correctly.");
+		}
+
+		var scopes = shippingServiceConfig.GetSection("Scopes").Get<string[]>();
+		if (scopes == null || scopes.Length == 0)
+		{
+			_logger.LogError("ShippingService scopes not configured");
+			throw new InvalidOperationException("ShippingService scopes are missing. Please ensure 'DownstreamApis:ShippingService:Scopes' is configured in appsettings.json.");
+		}
 
 		var agentUserId = agentIdentity ?? _configuration["AgentIdentities:AgentUserId"];
+		if (string.IsNullOrEmpty(agentUserId))
+		{
+			_logger.LogError("Agent user identity not provided and not configured");
+			throw new InvalidOperationException("Agent user identity is required. Please provide an agentIdentity parameter or configure 'AgentIdentities:AgentUserId' in appsettings.json.");
+		}
+
+		if (string.IsNullOrEmpty(userUpn))
+		{
+			_logger.LogError("User UPN is required for agent user identity operations");
+			throw new ArgumentException("User UPN cannot be null or empty", nameof(userUpn));
+		}
+
 		_logger.LogInformation("Acquiring token for Shipping Service using agent user identity {AgentUserId} with user {UserUpn}",
 			agentUserId, userUpn);
 
@@ -109,12 +157,39 @@ public class OrchestrationService
 	public async Task<bool> SendEmailAsync(EmailRequest emailRequest, string userUpn, string? agentIdentity = null)
 	{
 		var emailServiceConfig = _configuration.GetSection("DownstreamApis:EmailService");
-		var emailServiceUrl = _configuration.GetValue<string>("services:emailservice:https:0")
-			?? throw new InvalidOperationException("EmailService URL not configured");
-		var scopes = emailServiceConfig.GetSection("Scopes").Get<string[]>()
-			?? throw new InvalidOperationException("EmailService scopes not configured");
+		if (!emailServiceConfig.Exists())
+		{
+			_logger.LogError("EmailService configuration section not found in appsettings");
+			throw new InvalidOperationException("EmailService configuration is missing. Please ensure 'DownstreamApis:EmailService' is configured in appsettings.json.");
+		}
+
+		var emailServiceUrl = _configuration.GetValue<string>("services:emailservice:https:0");
+		if (string.IsNullOrEmpty(emailServiceUrl))
+		{
+			_logger.LogError("EmailService URL not configured");
+			throw new InvalidOperationException("EmailService URL is missing. This value is typically provided by Aspire service discovery. Ensure the service is configured correctly.");
+		}
+
+		var scopes = emailServiceConfig.GetSection("Scopes").Get<string[]>();
+		if (scopes == null || scopes.Length == 0)
+		{
+			_logger.LogError("EmailService scopes not configured");
+			throw new InvalidOperationException("EmailService scopes are missing. Please ensure 'DownstreamApis:EmailService:Scopes' is configured in appsettings.json.");
+		}
 
 		var agentUserId = agentIdentity ?? _configuration["AgentIdentities:AgentUserId"];
+		if (string.IsNullOrEmpty(agentUserId))
+		{
+			_logger.LogError("Agent user identity not provided and not configured");
+			throw new InvalidOperationException("Agent user identity is required. Please provide an agentIdentity parameter or configure 'AgentIdentities:AgentUserId' in appsettings.json.");
+		}
+
+		if (string.IsNullOrEmpty(userUpn))
+		{
+			_logger.LogError("User UPN is required for agent user identity operations");
+			throw new ArgumentException("User UPN cannot be null or empty", nameof(userUpn));
+		}
+
 		_logger.LogInformation("Acquiring token for Email Service using agent user identity {AgentUserId} with user {UserUpn}",
 			agentUserId, userUpn);
 
