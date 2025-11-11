@@ -9,8 +9,9 @@ A comprehensive sample demonstrating how AI agents securely call downstream serv
 ## 🎯 Overview
 
 This sample illustrates:
-- **Autonomous Agent Identity** (Order API - read operations)
+- **Autonomous Agent Identity** (Order API - read operations with app role-based access control)
 - **Agent User Identities** with user context (Shipping & Email APIs - write operations)  
+- **App Role-Based Authorization** - Order API accepts both delegated permissions (`Orders.Read`) and application permissions (`Orders.Read.All`)
 - **.NET Aspire Dashboard** - Distributed tracing, logs, metrics, and service map
 - **Service Discovery** - Dynamic service resolution via Aspire
 - **In-Memory Stores** - Simple demonstration without external dependencies
@@ -137,14 +138,25 @@ CustomerServiceAgent/
 
 ## 🔑 Key Features
 
-### 1. Autonomous Agent Identity (Read Operations)
+### 1. Autonomous Agent Identity with App Roles (Read Operations)
 ```csharp
-// OrderService uses autonomous agent identity
+// OrderService uses autonomous agent identity with app role-based access
 var authHeader = await _authorizationHeaderProvider
     .CreateAuthorizationHeaderForAppAsync(
         $"api://YOUR_SERVICE_CLIENT_ID/.default",
         new AuthorizationHeaderProviderOptions().WithAgentIdentity(autonomousAgentId)
     );
+```
+
+The Order Service uses `RequiredScopeOrAppPermission` attribute to accept both scopes and app roles:
+```csharp
+// Accepts both delegated permissions (scopes) and application permissions (app roles)
+[Authorize]
+[RequiredScopeOrAppPermission(
+    AcceptedScope = new[] { "Orders.Read" },
+    AcceptedAppPermission = new[] { "Orders.Read.All" }
+)]
+public class OrdersController : ControllerBase
 ```
 
 ### 2. Agent User Identity (Write Operations)

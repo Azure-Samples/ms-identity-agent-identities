@@ -12,7 +12,10 @@ namespace OrderService.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-//[RequiredScope("Orders.Read")]
+[RequiredScopeOrAppPermission(
+    AcceptedScope = new[] { "Orders.Read" },
+    AcceptedAppPermission = new[] { "Orders.Read.All" }
+)]
 public class OrdersController : ControllerBase
 {
     private readonly OrderStore _orderStore;
