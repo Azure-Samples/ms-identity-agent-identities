@@ -59,6 +59,18 @@ break;
 }
 
 /// <summary>
+/// Sanitizes user input to prevent log forging attacks by removing newlines and control characters
+/// </summary>
+private static string SanitizeForLog(string? input)
+{
+    if (string.IsNullOrEmpty(input))
+        return string.Empty;
+    
+    // Remove newlines, carriage returns, and other control characters that could be used for log forging
+    return System.Text.RegularExpressions.Regex.Replace(input, @"[\r\n\t\x00-\x1F\x7F]", "_");
+}
+
+/// <summary>
 /// Create a new Agent Identity with the specified name (for the current Agent Application).
 /// Optionally create a new agent user identity.
 /// </summary>
@@ -71,7 +83,7 @@ var logger = HttpContext.RequestServices.GetRequiredService<ILogger<AgentIdentit
 
 try
 {
-logger.LogInformation("Creating agent identity with name: {AgentIdentityName}", agentIdentityName);
+logger.LogInformation("Creating agent identity with name: {AgentIdentityName}", SanitizeForLog(agentIdentityName));
 
 // Call the downstream API with a POST request to create an Agent Identity
 // Use "Logging:LogLevel:Microsoft.Identity.Web": "Debug" in the configuration if this fails.
@@ -91,7 +103,7 @@ AgentUserIdentity? newAgentUserId = null;
 string adminConsentUrl = string.Empty;
 if (!string.IsNullOrEmpty(agentUserIdentityUpn))
 {
-logger.LogInformation("Creating agent user identity with UPN: {AgentUserIdentityUpn}", agentUserIdentityUpn);
+logger.LogInformation("Creating agent user identity with UPN: {AgentUserIdentityUpn}", SanitizeForLog(agentUserIdentityUpn));
 
 // Call the downstream API (canary Graph) with a POST request to create an Agent Identity
 newAgentUserId = await DownstreamApi.PostForAppAsync<AgentUserIdentity, AgentUserIdentity>(
@@ -183,7 +195,7 @@ var logger = HttpContext.RequestServices.GetRequiredService<ILogger<AgentIdentit
 
 try
 {
-logger.LogInformation("Deleting agent identity: {AgentIdentityId}", id);
+logger.LogInformation("Deleting agent identity: {AgentIdentityId}", SanitizeForLog(id));
 
 var result = await DownstreamApi.DeleteForAppAsync<string, object>(
 "msGraphAgentIdentity",
@@ -193,22 +205,22 @@ options =>
 options.RelativePath += $"/{id}"; // Specify the ID of the agent identity to delete
 });
 
-logger.LogInformation("Successfully deleted agent identity: {AgentIdentityId}", id);
+logger.LogInformation("Successfully deleted agent identity: {AgentIdentityId}", SanitizeForLog(id));
 return Ok(new { id, status = "deleted", result = result?.ToString() });
 }
 catch (MicrosoftIdentityWebChallengeUserException authEx)
 {
-logger.LogWarning(authEx, "Authentication challenge when deleting agent identity {AgentIdentityId}", id);
+logger.LogWarning(authEx, "Authentication challenge when deleting agent identity {AgentIdentityId}", SanitizeForLog(id));
 return Unauthorized(new { error = "Authentication required", details = "Unable to authenticate to Microsoft Graph. Please ensure you are signed in and have the required permissions." });
 }
 catch (HttpRequestException httpEx)
 {
-logger.LogError(httpEx, "HTTP error when deleting agent identity {AgentIdentityId}. Status: {StatusCode}", id, httpEx.StatusCode);
+logger.LogError(httpEx, "HTTP error when deleting agent identity {AgentIdentityId}. Status: {StatusCode}", SanitizeForLog(id), httpEx.StatusCode);
 return StatusCode(503, new { error = "Service unavailable", details = "Unable to communicate with Microsoft Graph API. Please try again later." });
 }
 catch (Exception ex)
 {
-logger.LogError(ex, "Unexpected error when deleting agent identity {AgentIdentityId}", id);
+logger.LogError(ex, "Unexpected error when deleting agent identity {AgentIdentityId}", SanitizeForLog(id));
 return StatusCode(500, new { error = "Internal server error", details = "An unexpected error occurred while deleting the agent identity. Please contact support if this persists." });
 }
 }
