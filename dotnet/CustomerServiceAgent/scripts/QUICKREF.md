@@ -26,12 +26,12 @@
 
 | Resource | Name | Description |
 |----------|------|-------------|
-| **Blueprint App** | CustomerService-Orchestrator | Agent Identity Blueprint with client secret and inheritable permissions |
-| **Order API** | CustomerService-OrderAPI | Exposes `Orders.Read` scope |
-| **Shipping API** | CustomerService-ShippingAPI | Exposes `Shipping.Read`, `Shipping.Write` scopes |
-| **Email API** | CustomerService-EmailAPI | Exposes `Email.Send` scope |
-| **Autonomous Agent** | CustomerService-AutonomousAgent | Manual setup in Azure Portal (for OrderService) |
-| **Agent User** | CustomerService-AgentUser | Manual setup in Azure Portal (for Shipping/Email with user context) |
+| **Blueprint App** | CustomerServiceSample-Orchestrator | Agent Identity Blueprint with client secret and inheritable permissions |
+| **Order API** | CustomerServiceSample-OrderAPI | Exposes `Orders.Read` scope |
+| **Shipping API** | CustomerServiceSample-ShippingAPI | Exposes `Shipping.Read`, `Shipping.Write` scopes |
+| **Email API** | CustomerServiceSample-EmailAPI | Exposes `Email.Send` scope |
+| **Autonomous Agent** | CustomerServiceSample-AutonomousAgent | Manual setup in Azure Portal (for OrderService) |
+| **Agent User** | CustomerServiceSample-AgentUser | Manual setup in Azure Portal (for Shipping/Email with user context) |
 
 Note: With custom prefix (e.g., `-SampleInstancePrefix "Demo-"`), all resources are prefixed accordingly.
 
@@ -77,17 +77,17 @@ Note: With custom prefix (e.g., `-SampleInstancePrefix "Demo-"`), all resources 
 
 ```powershell
 # Check apps were created (default prefix)
-Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
+Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
 
 # Check apps with custom prefix
 Get-MgApplication -Filter "startswith(displayName, 'Demo-')"
 
 # Check blueprint app permissions (inheritable permissions)
-$blueprint = Get-MgApplication -Filter "displayName eq 'CustomerService-Orchestrator'"
+$blueprint = Get-MgApplication -Filter "displayName eq 'CustomerServiceSample-Orchestrator'"
 $blueprint.RequiredResourceAccess
 
 # Check service scopes
-$orderService = Get-MgApplication -Filter "displayName eq 'CustomerService-OrderAPI'"
+$orderService = Get-MgApplication -Filter "displayName eq 'CustomerServiceSample-OrderAPI'"
 $orderService.Api.Oauth2PermissionScopes
 ```
 

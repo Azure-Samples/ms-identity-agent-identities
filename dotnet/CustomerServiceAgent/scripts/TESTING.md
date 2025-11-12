@@ -67,7 +67,7 @@ if ($help.Synopsis -and $help.Examples) {
 **Purpose**: Verify script creates all resources correctly in a clean tenant.
 
 **Prerequisites**:
-- Clean tenant with NO existing CustomerService-* applications
+- Clean tenant with NO existing CustomerServiceSample-* applications
 - Signed in to Graph PowerShell with required permissions
 
 **Steps**:
@@ -79,15 +79,15 @@ Connect-MgGraph -Scopes "Application.ReadWrite.All","Directory.ReadWrite.All","A
 .\Setup-EntraIdApps.ps1 -SkipAgentIdentities
 
 # Verify applications were created
-Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
+Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
 ```
 
 **Expected Results**:
 - ✅ 4 applications created:
-  - CustomerService-Orchestrator (blueprint application)
-  - CustomerService-OrderAPI
-  - CustomerService-ShippingAPI
-  - CustomerService-EmailAPI
+  - CustomerServiceSample-Orchestrator (blueprint application)
+  - CustomerServiceSample-OrderAPI
+  - CustomerServiceSample-ShippingAPI
+  - CustomerServiceSample-EmailAPI
 - ✅ Each service has correct scopes configured
 - ✅ Blueprint has client secret
 - ✅ Blueprint has inheritable permissions to all downstream services
@@ -98,15 +98,15 @@ Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
 **Verification Commands**:
 ```powershell
 # Check applications
-$apps = Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
+$apps = Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
 Write-Host "Applications created: $($apps.Count)" -ForegroundColor Cyan
 
 # Check orchestrator secret
-$orchestrator = $apps | Where-Object { $_.DisplayName -eq 'CustomerService-Orchestrator' }
+$orchestrator = $apps | Where-Object { $_.DisplayName -eq 'CustomerServiceSample-Orchestrator' }
 Write-Host "Orchestrator has $($orchestrator.PasswordCredentials.Count) secrets" -ForegroundColor Cyan
 
 # Check service scopes
-$orderService = $apps | Where-Object { $_.DisplayName -eq 'CustomerService-OrderAPI' }
+$orderService = $apps | Where-Object { $_.DisplayName -eq 'CustomerServiceSample-OrderAPI' }
 Write-Host "Order service scopes: $($orderService.Api.Oauth2PermissionScopes.Value -join ', ')" -ForegroundColor Cyan
 
 # Check permissions
@@ -126,8 +126,8 @@ Write-Host "Orchestrator permissions: $($orchestrator.RequiredResourceAccess.Cou
 **Steps**:
 ```powershell
 # Count existing apps and secrets
-$appsBefore = Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
-$orchestratorBefore = $appsBefore | Where-Object { $_.DisplayName -eq 'CustomerService-Orchestrator' }
+$appsBefore = Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
+$orchestratorBefore = $appsBefore | Where-Object { $_.DisplayName -eq 'CustomerServiceSample-Orchestrator' }
 $secretCountBefore = $orchestratorBefore.PasswordCredentials.Count
 
 Write-Host "Before: $($appsBefore.Count) apps, $secretCountBefore secrets" -ForegroundColor Yellow
@@ -136,8 +136,8 @@ Write-Host "Before: $($appsBefore.Count) apps, $secretCountBefore secrets" -Fore
 .\Setup-EntraIdApps.ps1 -SkipAgentIdentities
 
 # Count after
-$appsAfter = Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
-$orchestratorAfter = $appsAfter | Where-Object { $_.DisplayName -eq 'CustomerService-Orchestrator' }
+$appsAfter = Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
+$orchestratorAfter = $appsAfter | Where-Object { $_.DisplayName -eq 'CustomerServiceSample-Orchestrator' }
 $secretCountAfter = $orchestratorAfter.PasswordCredentials.Count
 
 Write-Host "After: $($appsAfter.Count) apps, $secretCountAfter secrets" -ForegroundColor Yellow
@@ -283,8 +283,8 @@ Connect-MgGraph -Scopes "User.Read"
 After testing is complete, clean up test resources:
 
 ```powershell
-# Get all CustomerService apps
-$apps = Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
+# Get all CustomerServiceSample apps
+$apps = Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
 
 # Remove each app
 foreach ($app in $apps) {
@@ -293,7 +293,7 @@ foreach ($app in $apps) {
 }
 
 # Verify cleanup
-$remaining = Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
+$remaining = Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
 if ($remaining.Count -eq 0) {
     Write-Host "✓ Cleanup complete" -ForegroundColor Green
 } else {
@@ -333,7 +333,7 @@ You can run all non-interactive tests with:
 After running the script, manually verify in Azure Portal:
 
 1. Navigate to **Entra ID** → **App registrations**
-2. Find all CustomerService-* applications
+2. Find all CustomerServiceSample-* applications
 3. Check each service has:
    - Correct Application ID URI
    - Correct scopes exposed
