@@ -204,15 +204,75 @@ Edit `src/AgentOrchestrator/appsettings.json`:
   },
   "AgentIdentities": {
     "AgentIdentity": "YOUR_AUTONOMOUS_AGENT_ID",
-    "AgentUserId": "YOUR_AGENT_USER_ID"
+    "AgentUserId": "YOUR_AGENT_USER_ID",
+    "SponsorUserId": "HUMAN_SPONSOR_USER_ID"
   },
-  "Services": {
-    "OrderService": "https://localhost:7001",
-    "ShippingService": "https://localhost:7003",
-    "EmailService": "https://localhost:7004"
+  "DownstreamApis": {
+    "OrderService": {
+      "BaseUrl": "https://localhost:7001",
+      "Scopes": ["api://YOUR_ORDER_SERVICE_CLIENT_ID/.default"]
+    },
+    "ShippingService": {
+      "BaseUrl": "https://localhost:7003",
+      "Scopes": ["api://YOUR_SHIPPING_SERVICE_CLIENT_ID/.default"]
+    },
+    "EmailService": {
+      "BaseUrl": "https://localhost:7004",
+      "Scopes": ["api://YOUR_EMAIL_SERVICE_CLIENT_ID/.default"]
+    },
+    "MicrosoftGraph": {
+      "BaseUrl": "https://graph.microsoft.com/v1.0",
+      "Scopes": "User.Read Mail.Send ChannelMessage.Send"
+    }
   }
 }
 ```
+
+#### Configuration Field Mapping
+
+**Values from Automated Script** (when using `Setup-EntraIdApps.ps1 -OutputFormat UpdateConfig`):
+- ✅ `TenantId` - Auto-populated from your Azure AD tenant
+- ✅ `ClientId` - Auto-populated from created orchestrator app registration
+- ✅ `SponsorUserId` - Auto-populated with the Object ID of the user running the script
+- ✅ Service `ClientId` values in `DownstreamApis` scopes - Auto-populated for Order, Shipping, Email services
+
+**Values Requiring Manual Setup**:
+- ⚠️ `AgentIdentity` - Set to the Object ID of the autonomous agent identity (created in Step 7)
+- ⚠️ `AgentUserId` - Set to the Object ID of the agent user identity (created in Step 8)
+- ⚠️ `ClientSecret` - Should be stored in User Secrets (development) or Azure Key Vault (production), NOT in appsettings.json
+
+#### Field Descriptions
+
+- **`AgentIdentity`**: Object ID of the autonomous agent identity for app-only operations (Order Service read operations)
+- **`AgentUserId`**: Object ID of the agent user identity for delegated operations requiring user context (Shipping, Email services)
+- **`SponsorUserId`** (Required): Object ID of the human user who sponsors the agent identities
+  - This identifies the person responsible for the agent's operations
+  - Default: User running the setup script
+  - Can be changed to another user's Object ID if needed
+  - Find Object ID in Azure Portal → Entra ID → Users → [User] → Object ID
+
+#### Microsoft Graph Scopes Format
+
+**Important**: Microsoft Graph uses a **space-delimited string** format for scopes:
+```json
+"MicrosoftGraph": {
+  "Scopes": "User.Read Mail.Send ChannelMessage.Send"  // Space-delimited string
+}
+```
+
+This differs from other downstream APIs which use an **array format**:
+```json
+"OrderService": {
+  "Scopes": ["api://YOUR_ORDER_SERVICE_CLIENT_ID/.default"]  // Array format
+}
+```
+
+**Why the difference?** The Microsoft Graph SDK requires scopes as a space-delimited string, while other APIs use Microsoft Identity Web's default array format.
+
+**To add additional Graph permissions**:
+1. Add the scope name to the string: `"User.Read Mail.Send Files.Read"`
+2. Ensure your app registration has these permissions granted
+3. See [Microsoft Graph Permissions Reference](https://learn.microsoft.com/graph/permissions-reference)
 
 ### Step 10: Update Downstream Service appsettings.json
 

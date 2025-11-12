@@ -196,6 +196,40 @@ To enable real Agent Identities:
 3. **Update appsettings.json** with your tenant and client IDs
 4. **Configure Program.cs** to use real Microsoft Identity Web services
 
+### Configuration Fields in appsettings.json
+
+The `src/AgentOrchestrator/appsettings.json` file contains the following key configuration sections:
+
+#### Agent Identities Configuration
+```json
+"AgentIdentities": {
+  "AgentIdentity": "YOUR_AGENT_IDENTITY_ID",
+  "AgentUserId": "YOUR_AGENT_USER_ID",
+  "SponsorUserId": "HUMAN_SPONSOR_USER_ID"
+}
+```
+
+- **`AgentIdentity`**: The Object ID of the autonomous agent identity used for read-only operations (e.g., Order Service)
+- **`AgentUserId`**: The Object ID of the agent user identity used for operations requiring user context (e.g., Shipping, Email services)
+- **`SponsorUserId`** (Required): The Object ID of the human user who sponsors/manages the agent identities. This is typically the user running the setup script or the person responsible for the agent's operations.
+
+#### Microsoft Graph Scopes Format
+```json
+"DownstreamApis": {
+  "MicrosoftGraph": {
+    "BaseUrl": "https://graph.microsoft.com/v1.0",
+    "Scopes": "User.Read Mail.Send ChannelMessage.Send"
+  }
+}
+```
+
+**Note**: Microsoft Graph scopes use a **space-delimited string** format (e.g., `"User.Read Mail.Send"`), while other downstream services use an **array format** (e.g., `["api://SERVICE_ID/.default"]`). This is due to the Microsoft Graph SDK requirements.
+
+To add additional Graph permissions:
+1. Add the scope name to the space-delimited string (e.g., `"User.Read Mail.Send Files.Read"`)
+2. Ensure your app registration has been granted these permissions
+3. See [Microsoft Graph Permissions Reference](https://learn.microsoft.com/graph/permissions-reference) for available scopes
+
 ## 🧪 Testing Scenarios
 
 ### Scenario 1: Agent Identity
