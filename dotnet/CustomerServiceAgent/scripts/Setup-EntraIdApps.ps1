@@ -158,6 +158,7 @@ $script:Results = @{
     Blueprint       = $null
     AutonomousAgent = $null
     AgentUser       = $null
+    SponsorUserId   = $null
     Errors          = @()
 }
 
@@ -1025,15 +1026,17 @@ function Invoke-Setup {
         # Step 1: Connect to Microsoft Graph
         $script:Results.TenantId = Connect-MicrosoftGraphIfNeeded -TenantIdParam $TenantId
         
-        # Get current user ID for ownership
+        # Get current user ID for ownership and SponsorUserId
         $currentUserId = $null
         try {
             $currentUser = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/me" -ErrorAction SilentlyContinue
             $currentUserId = $currentUser.id
-            Write-Status "Current user: $($currentUser.userPrincipalName)" -Type Info
+            $script:Results.SponsorUserId = $currentUserId
+            Write-Status "Current user: $($currentUser.userPrincipalName) (will be set as SponsorUserId)" -Type Info
         }
         catch {
             Write-Status "Could not retrieve current user information" -Type Warning
+            $script:Results.SponsorUserId = "HUMAN_SPONSOR_USER_ID"
         }
         
         # Step 2: Create Agent Identity Blueprint Application using specialized endpoint
@@ -1338,6 +1341,12 @@ function Show-PowerShellOutput {
         Write-Host "# Agent User Identity"
         Write-Host "`$AgentUserId = `"$($script:Results.AgentUser.Id)`""
     }
+    
+    if ($script:Results.SponsorUserId) {
+        Write-Host ""
+        Write-Host "# Sponsor User Identity (Human)"
+        Write-Host "`$SponsorUserId = `"$($script:Results.SponsorUserId)`""
+    }
 }
 
 function Show-JsonOutput {
@@ -1406,6 +1415,10 @@ function Show-JsonOutput {
         }
     }
     
+    if ($script:Results.SponsorUserId) {
+        $output.SponsorUserId = $script:Results.SponsorUserId
+    }
+    
     $output | ConvertTo-Json -Depth 10 | Write-Host
 }
 
@@ -1435,6 +1448,11 @@ function Show-EnvVarsOutput {
     
     if ($script:Results.AgentUser -and -not $script:Results.AgentUser.ManualSetupRequired) {
         Write-Host "`$env:AGENT_USER_ID = `"$($script:Results.AgentUser.Id)`""
+    }
+    
+    if ($script:Results.SponsorUserId) {
+        Write-Host ""
+        Write-Host "`$env:SPONSOR_USER_ID = `"$($script:Results.SponsorUserId)`""
     }
 }
 
