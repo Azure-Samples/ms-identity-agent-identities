@@ -234,7 +234,7 @@ Edit `src/AgentOrchestrator/appsettings.json`:
 - ✅ `TenantId` - Auto-populated from your Azure AD tenant
 - ✅ `ClientId` - Auto-populated from created orchestrator app registration
 - ✅ `SponsorUserId` - Auto-populated with the Object ID of the user running the script
-- ✅ Service `ClientId` values in `DownstreamApis` scopes - Auto-populated for Order, Shipping, Email services
+- ✅ Service `ClientId` values in `DownstreamApis` scopes - Auto-populated from created app registrations for Order, Shipping, Email services
 
 **Values Requiring Manual Setup**:
 - ⚠️ `AgentIdentity` - Set to the Object ID of the autonomous agent identity (created in Step 7)
@@ -243,8 +243,8 @@ Edit `src/AgentOrchestrator/appsettings.json`:
 
 #### Field Descriptions
 
-- **`AgentIdentity`**: Object ID of the autonomous agent identity for app-only operations (Order Service read operations)
-- **`AgentUserId`**: Object ID of the agent user identity for delegated operations requiring user context (Shipping, Email services)
+- **`AgentIdentity`**: The default agent identity used to call Order Service when no `AgentIdentity` parameter is provided in `CustomerService/process`.
+- **`AgentUserId`**: The Object ID of the agent user identity used by default for operations requiring user context (e.g., Shipping, Email services), when no `UserUpn` parameter is provided in `CustomerService/process`
 - **`SponsorUserId`** (Required): Object ID of the human user who sponsors the agent identities
   - This identifies the person responsible for the agent's operations
   - Default: User running the setup script

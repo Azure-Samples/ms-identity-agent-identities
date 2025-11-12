@@ -209,9 +209,9 @@ The `src/AgentOrchestrator/appsettings.json` file contains the following key con
 }
 ```
 
-- **`AgentIdentity`**: The Object ID of the autonomous agent identity used for read-only operations (e.g., Order Service)
-- **`AgentUserId`**: The Object ID of the agent user identity used for operations requiring user context (e.g., Shipping, Email services)
-- **`SponsorUserId`** (Required): The Object ID of the human user who sponsors/manages the agent identities. This is typically the user running the setup script or the person responsible for the agent's operations.
+- **`AgentIdentity`**: The default agent identity used to call Order Service when no `AgentIdentity` parameter is provided in `CustomerService/process`.
+- **`AgentUserId`**: The Object ID of the agent user identity used by default for operations requiring user context (e.g., Shipping, Email services), when no `UserUpn` parameter is provided in `CustomerService/process`
+- **`SponsorUserId`** (Required): The Object ID of the human user who sponsors/manages the agent identities. This is typically the user running the setup script or the person responsible for the agent's operations. It's needed when calling `POST /AgentIdentity` to create the agent identity (and agent user name)
 
 #### Microsoft Graph Scopes Format
 ```json
