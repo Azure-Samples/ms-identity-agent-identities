@@ -1139,34 +1139,6 @@ function Invoke-Setup {
         Write-Host "`n--- Step 6: Granting Admin Consent for Inheritable Permissions ---`n" -ForegroundColor Yellow
         Grant-AdminConsent -ClientAppClientId $script:Results.Orchestrator.ClientId
         
-        # Step 7.5: Assign App Roles to orchestrator service principal
-        Write-Host "`n--- Step 6.5: Assigning App Roles to Orchestrator ---`n" -ForegroundColor Yellow
-        
-        # For each service that has app roles, assign them to the orchestrator
-        foreach ($service in $script:Config.Services) {
-            if ($service.AppRoles -and $service.AppRoles.Count -gt 0) {
-                Write-Status "Assigning app roles from $($service.DisplayName)..." -Type Info
-                
-                $serviceResult = $script:Results.Services[$service.Name]
-                
-                # Get or create service principal for the resource (downstream service)
-                $resourceSp = Get-MgServicePrincipal -Filter "appId eq '$($serviceResult.ClientId)'" -ErrorAction SilentlyContinue
-                if (-not $resourceSp) {
-                    Write-Status "Creating service principal for: $($service.DisplayName)" -Type Info
-                    $resourceSp = New-MgServicePrincipal -AppId $serviceResult.ClientId
-                    Start-Sleep -Seconds 2
-                }
-                
-                # Assign each app role to the orchestrator
-                foreach ($appRole in $service.AppRoles) {
-                    Ensure-AppRoleAssignment `
-                        -PrincipalServicePrincipalId $blueprintSp.Id `
-                        -ResourceServicePrincipalId $resourceSp.Id `
-                        -AppRoleId $appRole.Id
-                }
-            }
-        }
-        
        
         # Step 8: Grant the blueprint service principal the 'AgentIdentity.CreateAsManager' role in Microsoft Graph
         
@@ -1404,6 +1376,40 @@ function Update-ConfigFiles {
     $scriptDir = Split-Path -Parent $PSCommandPath
     $projectRoot = Split-Path -Parent $scriptDir
     
+    # Get current user ID for SponsorUserId and tenant information
+    $currentUserId = $null
+    $tenantDomain = $null
+    try {
+        $currentUser = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/me" -ErrorAction SilentlyContinue
+        $currentUserId = $currentUser.id
+        Write-Status "Setting SponsorUserId to current user: $($currentUser.userPrincipalName) ($currentUserId)" -Type Info
+        
+        # Extract tenant domain from user's UPN or get from organization info
+        if ($currentUser.userPrincipalName -match "@(.+)$") {
+            $tenantDomain = $Matches[1]
+            Write-Status "Detected tenant domain: $tenantDomain" -Type Info
+        }
+        else {
+            # Fallback: Get tenant domain from organization endpoint
+            try {
+                $org = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/organization" -ErrorAction SilentlyContinue
+                if ($org.value -and $org.value[0].verifiedDomains) {
+                    $defaultDomain = $org.value[0].verifiedDomains | Where-Object { $_.isDefault -eq $true } | Select-Object -First 1
+                    if ($defaultDomain) {
+                        $tenantDomain = $defaultDomain.name
+                        Write-Status "Retrieved tenant domain from organization: $tenantDomain" -Type Info
+                    }
+                }
+            }
+            catch {
+                Write-Status "Could not retrieve tenant domain from organization endpoint" -Type Warning
+            }
+        }
+    }
+    catch {
+        Write-Status "Could not retrieve current user ID for SponsorUserId" -Type Warning
+    }
+    
     # Update Orchestrator appsettings.json
     $orchestratorConfigPath = Join-Path $projectRoot "src\AgentOrchestrator\appsettings.json"
     if (Test-Path $orchestratorConfigPath) {
@@ -1429,6 +1435,14 @@ function Update-ConfigFiles {
             $config.AgentIdentities.AgentUserId = "YOUR_AGENT_USER_ID"
         }
         
+        # Set SponsorUserId to current user's object ID
+        if ($currentUserId) {
+            $config.AgentIdentities.SponsorUserId = $currentUserId
+        }
+        else {
+            $config.AgentIdentities.SponsorUserId = "HUMAN_SPONSOR_USER_ID"
+        }
+        
         # Update downstream API scopes
         foreach ($serviceName in $script:Results.Services.Keys) {
             $service = $script:Results.Services[$serviceName]
@@ -1450,6 +1464,27 @@ function Update-ConfigFiles {
     }
     else {
         Write-Status "Orchestrator config file not found: $orchestratorConfigPath" -Type Warning
+    }
+    
+    # Update .http file with tenant domain
+    $httpFilePath = Join-Path $projectRoot "src\AgentOrchestrator\AgentOrchestrator.http"
+    if (Test-Path $httpFilePath) {
+        Write-Status "Updating: $httpFilePath" -Type Info
+        
+        $httpContent = Get-Content $httpFilePath -Raw
+        
+        if ($tenantDomain) {
+            # Replace the TenantName variable
+            $httpContent = $httpContent -replace '(?m)^@TenantName=.*$', "@TenantName=$tenantDomain"
+            Set-Content $httpFilePath -Value $httpContent
+            Write-Status "Updated TenantName to: $tenantDomain" -Type Success
+        }
+        else {
+            Write-Status "Could not determine tenant domain. TenantName in .http file not updated." -Type Warning
+        }
+    }
+    else {
+        Write-Status ".http file not found: $httpFilePath" -Type Warning
     }
     
     # Update each service appsettings.json
