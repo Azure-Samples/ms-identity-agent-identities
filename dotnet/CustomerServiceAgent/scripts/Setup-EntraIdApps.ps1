@@ -1476,7 +1476,7 @@ function Update-ConfigFiles {
         if ($tenantDomain) {
             # Replace the TenantName variable
             $httpContent = $httpContent -replace '(?m)^@TenantName=.*$', "@TenantName=$tenantDomain"
-            Set-Content $httpFilePath -Value $httpContent -NoNewline
+            Set-Content $httpFilePath -Value $httpContent
             Write-Status "Updated TenantName to: $tenantDomain" -Type Success
         }
         else {
