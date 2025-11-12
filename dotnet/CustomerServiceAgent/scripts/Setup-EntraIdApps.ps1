@@ -32,6 +32,11 @@
     UPN for the agent user service account (e.g., csr-agent@yourdomain.com).
     Required for Agent User Identity creation unless -SkipAgentIdentities is used.
 
+.PARAMETER LogToFile
+    When specified, creates a detailed log file in the script directory with timestamp.
+    Useful for troubleshooting, CI/CD pipelines, or documenting the setup process.
+    Log includes all status messages, errors, and stack traces.
+
 .EXAMPLE
     .\Setup-EntraIdApps.ps1
     Interactive mode - uses current Graph connection, outputs PowerShell variables
@@ -52,6 +57,10 @@
     .\Setup-EntraIdApps.ps1 -SkipAgentIdentities
     Skips Agent Identity creation (useful for tenants without this preview feature)
 
+.EXAMPLE
+    .\Setup-EntraIdApps.ps1 -LogToFile
+    Runs setup and saves detailed log to timestamped file for troubleshooting
+
 .NOTES
     Prerequisites:
     - Microsoft.Graph PowerShell module (Install-Module Microsoft.Graph)
@@ -60,7 +69,7 @@
     - For Agent Identities: Tenant must have Agent Identity Blueprints preview feature
     
     Author: Microsoft Identity Team
-    Version: 2.0.0
+    Version: 2.1.0
 #>
 
 [CmdletBinding()]
@@ -79,12 +88,24 @@ param(
     [switch]$SkipAgentIdentities,
     
     [Parameter(Mandatory = $false)]
-    [string]$ServiceAccountUpn
+    [string]$ServiceAccountUpn,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$LogToFile
 )
 
 # Error handling
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+# Create log file path with timestamp
+$script:LogFilePath = $null
+if ($PSBoundParameters.ContainsKey('LogToFile') -and $LogToFile) {
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $script:LogFilePath = Join-Path $PSScriptRoot "Setup-EntraIdApps-$timestamp.log"
+    "Script execution started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $script:LogFilePath -Encoding UTF8
+    Write-Host "Logging to file: $script:LogFilePath" -ForegroundColor Cyan
+}
 
 # Script configuration
 $script:Config = @{
@@ -149,7 +170,10 @@ function Write-Status {
         
         [Parameter(Mandatory = $false)]
         [ValidateSet('Info', 'Success', 'Warning', 'Error')]
-        [string]$Type = 'Info'
+        [string]$Type = 'Info',
+        
+        [Parameter(Mandatory = $false)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord
     )
     
     $color = switch ($Type) {
@@ -166,7 +190,27 @@ function Write-Status {
         'Error' { '[ERROR]' }
     }
     
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    $logMessage = "$timestamp $prefix $Message"
+    
+    # Write to console
     Write-Host "$prefix $Message" -ForegroundColor $color
+    
+    # Write to log file if enabled
+    if ($script:LogFilePath) {
+        $logMessage | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+        
+        # Add error details if available
+        if ($ErrorRecord) {
+            "  Exception: $($ErrorRecord.Exception.Message)" | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+            "  Category: $($ErrorRecord.CategoryInfo.Category)" | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+            "  TargetObject: $($ErrorRecord.TargetObject)" | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+            if ($ErrorRecord.ScriptStackTrace) {
+                "  Stack Trace:" | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+                $ErrorRecord.ScriptStackTrace | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+            }
+        }
+    }
 }
 
 function Connect-MicrosoftGraphIfNeeded {
@@ -214,7 +258,9 @@ function Connect-MicrosoftGraphIfNeeded {
         return $context.TenantId
     }
     catch {
-        Write-Status "Failed to connect to Microsoft Graph: $($_.Exception.Message)" -Type Error
+        Write-Status "Failed to connect to Microsoft Graph" -Type Error -ErrorRecord $_
+        Write-Status "Ensure you have the Microsoft.Graph PowerShell module installed: Install-Module Microsoft.Graph" -Type Error
+        Write-Status "You may need to run as administrator or have sufficient permissions in the tenant" -Type Error
         throw
     }
 }
@@ -256,7 +302,9 @@ function Get-OrCreateApplication {
         return $app
     }
     catch {
-        Write-Status "Error managing app $DisplayName : $($_.Exception.Message)" -Type Error
+        Write-Status "Error managing application '$DisplayName'" -Type Error -ErrorRecord $_
+        Write-Status "Common causes: Insufficient permissions, network issues, or naming conflicts" -Type Error
+        Write-Status "Required permissions: Application.ReadWrite.All" -Type Error
         throw
     }
 }
@@ -1165,10 +1213,30 @@ function Invoke-Setup {
         Write-Host "========================================`n" -ForegroundColor Cyan
         
         Show-Results
+        
+        if ($script:LogFilePath) {
+            Write-Status "Full execution log saved to: $script:LogFilePath" -Type Success
+        }
     }
     catch {
-        Write-Status "Setup failed: $($_.Exception.Message)" -Type Error
-        Write-Status "Stack trace: $($_.ScriptStackTrace)" -Type Error
+        Write-Status "Setup failed - see details below" -Type Error -ErrorRecord $_
+        Write-Status "Operation: $($_.InvocationInfo.MyCommand.Name)" -Type Error
+        Write-Status "Line: $($_.InvocationInfo.ScriptLineNumber)" -Type Error
+        
+        if ($script:LogFilePath) {
+            Write-Status "Full error log saved to: $script:LogFilePath" -Type Error
+            "========================================" | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+            "SCRIPT FAILED" | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+            "========================================" | Out-File -FilePath $script:LogFilePath -Append -Encoding UTF8
+        }
+        
+        Write-Host "`nTroubleshooting tips:" -ForegroundColor Yellow
+        Write-Host "1. Ensure you have the required permissions in the tenant" -ForegroundColor Yellow
+        Write-Host "2. Verify the Microsoft.Graph PowerShell module is installed and up to date" -ForegroundColor Yellow
+        Write-Host "3. Check if your tenant has the Agent Identity Blueprints preview feature enabled" -ForegroundColor Yellow
+        Write-Host "4. Review the error messages above for specific issues" -ForegroundColor Yellow
+        Write-Host "5. Run with -LogToFile switch to capture detailed logs for support" -ForegroundColor Yellow
+        
         exit 1
     }
 }
@@ -1418,7 +1486,8 @@ function Update-ConfigFiles {
         $config = Get-Content $orchestratorConfigPath -Raw | ConvertFrom-Json
         $config.AzureAd.TenantId = $script:Results.TenantId
         $config.AzureAd.ClientId = $script:Results.Orchestrator.ClientId
-        $config.AzureAd.ClientCredentials[0].ClientSecret = $script:Results.Orchestrator.ClientSecret
+        # Note: ClientSecret is NOT set in appsettings.json for security reasons
+        # It should be stored in User Secrets (development) or Azure Key Vault (production)
         
         # Update agent identities if available
         if ($script:Results.AutonomousAgent -and -not $script:Results.AutonomousAgent.ManualSetupRequired) {
@@ -1454,6 +1523,44 @@ function Update-ConfigFiles {
         
         $config | ConvertTo-Json -Depth 10 | Set-Content $orchestratorConfigPath
         Write-Status "Updated successfully" -Type Success
+        
+        # Automatically set the client secret using User Secrets for development
+        Write-Status "`nConfiguring client secret using User Secrets..." -Type Info
+        
+        $orchestratorProjectPath = Join-Path $projectRoot "src\AgentOrchestrator"
+        try {
+            Push-Location $orchestratorProjectPath
+            
+            # Initialize user secrets if not already done
+            $userSecretsOutput = dotnet user-secrets list 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Status "Initializing user secrets for AgentOrchestrator project..." -Type Info
+                dotnet user-secrets init
+            }
+            
+            # Set the client secret
+            $secretKey = "AzureAd:ClientCredentials:0:ClientSecret"
+            $secretValue = $script:Results.Orchestrator.ClientSecret
+            dotnet user-secrets set $secretKey $secretValue
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Status "Successfully configured client secret in User Secrets" -Type Success
+                Write-Status "The secret is stored securely outside of source control" -Type Info
+            } else {
+                throw "dotnet user-secrets command failed"
+            }
+        }
+        catch {
+            Write-Status "Could not automatically set User Secret. Please set it manually:" -Type Warning
+            Write-Status "  cd src\AgentOrchestrator" -Type Info
+            Write-Status "  dotnet user-secrets set `"AzureAd:ClientCredentials:0:ClientSecret`" `"$($script:Results.Orchestrator.ClientSecret)`"" -Type Info
+        }
+        finally {
+            Pop-Location
+        }
+        
+        Write-Status "For production, use Azure Key Vault or environment variables" -Type Info
+        Write-Status "See SECRETS-MANAGEMENT.md for detailed instructions`n" -Type Info
         
         if ($script:Results.AutonomousAgent -and $script:Results.AutonomousAgent.ManualSetupRequired) {
             Write-Status "Note: Update AgentIdentity field manually after creating the autonomous agent identity" -Type Warning
