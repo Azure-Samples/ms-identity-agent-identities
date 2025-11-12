@@ -115,6 +115,9 @@ $BlueprintClientSecret = "abc123..."
 $OrderClientId = "22222222-3333-4444-5555-666666666666"
 $ShippingClientId = "44444444-5555-6666-7777-888888888888"
 $EmailClientId = "55555555-6666-7777-8888-999999999999"
+
+# Sponsor User Identity (Human)
+$SponsorUserId = "99999999-aaaa-bbbb-cccc-dddddddddddd"
 ```
 
 ### Example 2: JSON Output for Automation
@@ -147,7 +150,8 @@ $EmailClientId = "55555555-6666-7777-8888-999999999999"
   "AgentUser": {
     "Id": "MANUAL_SETUP_REQUIRED",
     "Name": "CustomerService-AgentUser"
-  }
+  },
+  "SponsorUserId": "99999999-aaaa-bbbb-cccc-dddddddddddd"
 }
 ```
 
@@ -165,6 +169,8 @@ $env:BLUEPRINT_CLIENT_SECRET = "abc123..."
 $env:ORDER_CLIENT_ID = "22222222-3333-4444-5555-666666666666"
 $env:SHIPPING_CLIENT_ID = "44444444-5555-6666-7777-888888888888"
 $env:EMAIL_CLIENT_ID = "55555555-6666-7777-8888-999999999999"
+
+$env:SPONSOR_USER_ID = "99999999-aaaa-bbbb-cccc-dddddddddddd"
 ```
 
 ### Example 4: Direct Config File Update
