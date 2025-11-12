@@ -78,7 +78,7 @@ param(
     [string]$TenantId,
     
     [Parameter(Mandatory = $false)]
-    [string]$SampleInstancePrefix = "CustomerService2-",
+    [string]$SampleInstancePrefix = "CustomerServiceSample-",
     
     [Parameter(Mandatory = $false)]
     [ValidateSet('PowerShell', 'Json', 'EnvVars', 'UpdateConfig')]
@@ -135,6 +135,7 @@ $script:Config = @{
                 @{ Name = "Shipping.Read"; DisplayName = "Read shipping data"; Description = "Allows the application to read shipping information" }
                 @{ Name = "Shipping.Write"; DisplayName = "Write shipping data"; Description = "Allows the application to update shipping information" }
             )
+            AppRoles    = @()
         },
         @{
             Name        = "EmailAPI"
@@ -142,6 +143,7 @@ $script:Config = @{
             Scopes      = @(
                 @{ Name = "Email.Send"; DisplayName = "Send email"; Description = "Allows the application to send email notifications" }
             )
+            AppRoles    = @()
         }
     )
     AutonomousAgentName  = "${SampleInstancePrefix}AutonomousAgent"
@@ -465,7 +467,7 @@ function Ensure-AppRoles {
         
         # Get existing app roles
         $existingAppRoles = @()
-        if ($app.PSObject.Properties['AppRoles']) {
+        if ($app.AppRoles) {
             $existingAppRoles = $app.AppRoles
         }
         
@@ -488,12 +490,12 @@ function Ensure-AppRoles {
             }
             else {
                 $newAppRole = @{
-                    Id                  = $desiredRole.Id
-                    AllowedMemberTypes  = @("Application")
-                    Description         = $desiredRole.Description
-                    DisplayName         = $desiredRole.DisplayName
-                    IsEnabled           = $true
-                    Value               = $desiredRole.Value
+                    Id                 = $desiredRole.Id
+                    AllowedMemberTypes = @("Application")
+                    Description        = $desiredRole.Description
+                    DisplayName        = $desiredRole.DisplayName
+                    IsEnabled          = $true
+                    Value              = $desiredRole.Value
                 }
                 
                 $updatedAppRoles += $newAppRole
@@ -1049,9 +1051,9 @@ function Invoke-Setup {
                     UsedFallback  = $false
                 }
 
-                 Set-ApiScopes -ApplicationId $blueprintApp.id -AppClientId $blueprintApp.appId -Scopes $blueprintApp.scopes @(
-                @{ Name = "Agent.Access"; DisplayName = "Access agent"; Description = "Access the agent" }
-            )
+                Set-ApiScopes -ApplicationId $blueprintApp.id -AppClientId $blueprintApp.appId -Scopes $blueprintApp.scopes @(
+                    @{ Name = "Agent.Access"; DisplayName = "Access agent"; Description = "Access the agent" }
+                )
                 
             }
             catch {
@@ -1109,7 +1111,16 @@ function Invoke-Setup {
             
             if (-not $blueprintSp) {
                 Write-Status "Creating service principal for blueprint..." -Type Info
-                $blueprintSp = New-MgServicePrincipal -AppId $script:Results.Orchestrator.ClientId
+
+                # Prepare the body for the service principal creation
+                $body = @{
+                    appId = $script:Results.Orchestrator.ClientId
+                }
+        
+                # Create the service principal using the specialized endpoint
+                Write-Host "Making request to create service principal for Agent Blueprint: $script:Results.Orchestrator.ClientId" -ForegroundColor Cyan
+ 
+                $blueprintSp = Invoke-MgRestMethod -Uri "/beta/serviceprincipals/graph.agentIdentityBlueprintPrincipal" -Method POST -Body ($body | ConvertTo-Json) -ContentType "application/json"
                 Start-Sleep -Seconds 2
                 Write-Status "Service principal created successfully" -Type Success
             }
@@ -1138,7 +1149,7 @@ function Invoke-Setup {
             Set-ApiScopes -ApplicationId $serviceApp.Id -AppClientId $serviceApp.AppId -Scopes $service.Scopes
             
             # Configure app roles if defined
-            if ($service.PSObject.Properties['AppRoles'] -and $service.AppRoles.Count -gt 0) {
+            if ($service.AppRoles -and $service.AppRoles.Count -gt 0) {
                 Ensure-AppRoles -ApplicationId $serviceApp.Id -DesiredAppRoles $service.AppRoles
             }
             
@@ -1147,7 +1158,7 @@ function Invoke-Setup {
                 ClientId      = $serviceApp.AppId
                 DisplayName   = $serviceApp.DisplayName
                 Scopes        = $service.Scopes.Name
-                AppRoles      = if ($service.PSObject.Properties['AppRoles']) { $service.AppRoles } else { @() }
+                AppRoles      = if ($service.AppRoles) { $service.AppRoles } else { @() }
             }
             
             Write-Status "Service $($service.DisplayName) configured successfully`n" -Type Success
@@ -1176,34 +1187,6 @@ function Invoke-Setup {
         Write-Host "`n--- Step 6: Granting Admin Consent for Inheritable Permissions ---`n" -ForegroundColor Yellow
         Grant-AdminConsent -ClientAppClientId $script:Results.Orchestrator.ClientId
         
-        # Step 7.5: Assign App Roles to orchestrator service principal
-        Write-Host "`n--- Step 6.5: Assigning App Roles to Orchestrator ---`n" -ForegroundColor Yellow
-        
-        # For each service that has app roles, assign them to the orchestrator
-        foreach ($service in $script:Config.Services) {
-            if ($service.PSObject.Properties['AppRoles'] -and $service.AppRoles.Count -gt 0) {
-                Write-Status "Assigning app roles from $($service.DisplayName)..." -Type Info
-                
-                $serviceResult = $script:Results.Services[$service.Name]
-                
-                # Get or create service principal for the resource (downstream service)
-                $resourceSp = Get-MgServicePrincipal -Filter "appId eq '$($serviceResult.ClientId)'" -ErrorAction SilentlyContinue
-                if (-not $resourceSp) {
-                    Write-Status "Creating service principal for: $($service.DisplayName)" -Type Info
-                    $resourceSp = New-MgServicePrincipal -AppId $serviceResult.ClientId
-                    Start-Sleep -Seconds 2
-                }
-                
-                # Assign each app role to the orchestrator
-                foreach ($appRole in $service.AppRoles) {
-                    Ensure-AppRoleAssignment `
-                        -PrincipalServicePrincipalId $blueprintSp.Id `
-                        -ResourceServicePrincipalId $resourceSp.Id `
-                        -AppRoleId $appRole.Id
-                }
-            }
-        }
-        
        
         # Step 8: Grant the blueprint service principal the 'AgentIdentity.CreateAsManager' role in Microsoft Graph
         
@@ -1224,97 +1207,6 @@ function Invoke-Setup {
             # Already done
         }
        
-
-        # # Step 8: Handle Agent Identities (if not skipped)
-        # # Convert the Agent blueprint client secret to a secure credential
-        # $SecureClientSecret = ConvertTo-SecureString $script:Results.Orchestrator.ClientSecret -AsPlainText -Force
-        # $ClientSecretCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $script:Results.Orchestrator.ClientId, $SecureClientSecret
-        
-        # # Connect to Microsoft Graph using the blueprint's credentials (no longer the user running the script)
-        # connect-mggraph -tenantId $script:Results.TenantId -ClientSecretCredential $ClientSecretCredential -ContextScope Process -NoWelcome
-        
-        # if (-not $SkipAgentIdentities) {
-        #     Write-Host "`n--- Step 7: Creating Agent Identities ---`n" -ForegroundColor Yellow
-            
-        #     # Store blueprint information
-        #     $script:Results.Blueprint = @{
-        #         Id            = $script:Results.Orchestrator.ClientId
-        #         Name          = $script:Config.BlueprintName
-        #         ApplicationId = $script:Results.Orchestrator.ClientId
-        #     }
-            
-        #     # Create Autonomous Agent Identity (for OrderService)
-        #     Write-Host "`n--- Step 8: Creating Agent Identity ---`n" -ForegroundColor Yellow
-        #     Write-Status "This identity will be used for calling OrderService" -Type Info
-            
-        #     try {
-        #         $autonomousAgent = New-AgentIdentity `
-        #             -BlueprintAppId $script:Results.Orchestrator.ClientId `
-        #             -AgentName $script:Config.AutonomousAgentName `
-        #             -Type "Autonomous" `
-        #             -CurrentUserId $currentUserId
-                
-        #         $script:Results.AutonomousAgent = $autonomousAgent     
-        #         Write-Status "Autonomous Agent Identity created successfully!" -Type Success
-
-        #     }
-        #     catch {
-        #         Write-Status "Could not create Autonomous Agent Identity automatically" -Type Warning
-        #         $script:Results.AutonomousAgent = @{
-        #             Id                  = "MANUAL_SETUP_REQUIRED"
-        #             Name                = $script:Config.AutonomousAgentName
-        #             Type                = "Autonomous"
-        #             Purpose             = "For calling OrderService autonomously"
-        #             ManualSetupRequired = $true
-        #         }
-        #     }
-            
-        #     # Create Agent User Identity (for Shipping/EmailService with user context)
-        #     Write-Host "`n--- Step 9: Creating Agent User Identity ---`n" -ForegroundColor Yellow
-        #     Write-Status "This identity will be used for calling ShippingService and EmailService with user context" -Type Info
-            
-        #     if (-not $ServiceAccountUpn) {
-        #         Write-Status "ServiceAccountUpn not provided. Agent User Identity will need to be created manually." -Type Warning
-        #         $script:Results.Errors += "ServiceAccountUpn required for Agent User Identity"
-                
-        #         $script:Results.AgentUser = @{
-        #             Id                  = "MANUAL_SETUP_REQUIRED"
-        #             Name                = $script:Config.AgentUserName
-        #             Type                = "AgentUser"
-        #             Purpose             = "For calling ShippingService and EmailService with user context"
-        #             ManualSetupRequired = $true
-        #         }
-        #     }
-        #     else {
-        #         try {
-        #             $agentUser = New-AgentIdentity `
-        #                 -BlueprintAppId $script:Results.Orchestrator.ClientId `
-        #                 -AgentName $script:Config.AgentUserName `
-        #                 -Type "AgentUser" `
-        #                 -CurrentUserId $currentUserId `
-        #                 -ServiceAccountUpn $ServiceAccountUpn
-                    
-        #             $script:Results.AgentUser = $agentUser
-                    
-        #                 Write-Status "Agent User Identity created successfully!" -Type Success
-        #         }
-        #         catch {
-        #             Write-Status "Could not create Agent User Identity automatically" -Type Warning
-        #             $script:Results.AgentUser = @{
-        #                 Id                  = "MANUAL_SETUP_REQUIRED"
-        #                 Name                = $script:Config.AgentUserName
-        #                 Type                = "AgentUser"
-        #                 ServiceAccountUpn   = $ServiceAccountUpn
-        #                 Purpose             = "For calling ShippingService and EmailService with user context"
-        #                 ManualSetupRequired = $true
-        #             }
-        #         }
-        #     }
-        # }
-        # else {
-        #     Write-Status "Skipping Agent Identity creation (use without -SkipAgentIdentities to enable)" -Type Info
-        # }
-        
         # Step 10: Output Results
         Write-Host "`n========================================" -ForegroundColor Cyan
         Write-Host "Setup Completed Successfully!" -ForegroundColor Green
@@ -1552,6 +1444,40 @@ function Update-ConfigFiles {
     $scriptDir = Split-Path -Parent $PSCommandPath
     $projectRoot = Split-Path -Parent $scriptDir
     
+    # Get current user ID for SponsorUserId and tenant information
+    $currentUserId = $null
+    $tenantDomain = $null
+    try {
+        $currentUser = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/me" -ErrorAction SilentlyContinue
+        $currentUserId = $currentUser.id
+        Write-Status "Setting SponsorUserId to current user: $($currentUser.userPrincipalName) ($currentUserId)" -Type Info
+        
+        # Extract tenant domain from user's UPN or get from organization info
+        if ($currentUser.userPrincipalName -match "@(.+)$") {
+            $tenantDomain = $Matches[1]
+            Write-Status "Detected tenant domain: $tenantDomain" -Type Info
+        }
+        else {
+            # Fallback: Get tenant domain from organization endpoint
+            try {
+                $org = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/organization" -ErrorAction SilentlyContinue
+                if ($org.value -and $org.value[0].verifiedDomains) {
+                    $defaultDomain = $org.value[0].verifiedDomains | Where-Object { $_.isDefault -eq $true } | Select-Object -First 1
+                    if ($defaultDomain) {
+                        $tenantDomain = $defaultDomain.name
+                        Write-Status "Retrieved tenant domain from organization: $tenantDomain" -Type Info
+                    }
+                }
+            }
+            catch {
+                Write-Status "Could not retrieve tenant domain from organization endpoint" -Type Warning
+            }
+        }
+    }
+    catch {
+        Write-Status "Could not retrieve current user ID for SponsorUserId" -Type Warning
+    }
+    
     # Update Orchestrator appsettings.json
     $orchestratorConfigPath = Join-Path $projectRoot "src\AgentOrchestrator\appsettings.json"
     if (Test-Path $orchestratorConfigPath) {
@@ -1576,6 +1502,14 @@ function Update-ConfigFiles {
         }
         else {
             $config.AgentIdentities.AgentUserId = "YOUR_AGENT_USER_ID"
+        }
+        
+        # Set SponsorUserId to current user's object ID
+        if ($currentUserId) {
+            $config.AgentIdentities.SponsorUserId = $currentUserId
+        }
+        else {
+            $config.AgentIdentities.SponsorUserId = "HUMAN_SPONSOR_USER_ID"
         }
         
         # Update downstream API scopes
@@ -1637,6 +1571,27 @@ function Update-ConfigFiles {
     }
     else {
         Write-Status "Orchestrator config file not found: $orchestratorConfigPath" -Type Warning
+    }
+    
+    # Update .http file with tenant domain
+    $httpFilePath = Join-Path $projectRoot "src\AgentOrchestrator\AgentOrchestrator.http"
+    if (Test-Path $httpFilePath) {
+        Write-Status "Updating: $httpFilePath" -Type Info
+        
+        $httpContent = Get-Content $httpFilePath -Raw
+        
+        if ($tenantDomain) {
+            # Replace the TenantName variable
+            $httpContent = $httpContent -replace '(?m)^@TenantName=.*$', "@TenantName=$tenantDomain"
+            Set-Content $httpFilePath -Value $httpContent
+            Write-Status "Updated TenantName to: $tenantDomain" -Type Success
+        }
+        else {
+            Write-Status "Could not determine tenant domain. TenantName in .http file not updated." -Type Warning
+        }
+    }
+    else {
+        Write-Status ".http file not found: $httpFilePath" -Type Warning
     }
     
     # Update each service appsettings.json
