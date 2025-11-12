@@ -77,7 +77,7 @@ public class OrchestrationService
 		httpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
 		_logger.LogInformation("Calling Order Service GET /api/orders/{OrderId}", orderId);
-		var response = await httpClient.GetAsync($"{orderServiceBaseUrl}/api/orders/{orderId}");
+		var response = await httpClient.GetAsync($"{orderServiceBaseUrl}/api/orders/{Uri.EscapeDataString(orderId)}");
 
 		if (response.IsSuccessStatusCode)
 		{
@@ -139,7 +139,7 @@ public class OrchestrationService
 		httpClient.DefaultRequestHeaders.Authorization = AuthenticationHeaderValue.Parse(authHeader);
 
 		_logger.LogInformation("Calling Shipping Service PUT /api/shipping/{OrderId}", orderId);
-		var response = await httpClient.PutAsJsonAsync($"{shippingServiceUrl}/api/shipping/{orderId}", updatedInfo);
+		var response = await httpClient.PutAsJsonAsync($"{shippingServiceUrl}/api/shipping/{Uri.EscapeDataString(orderId)}", updatedInfo);
 
 		if (response.IsSuccessStatusCode)
 		{

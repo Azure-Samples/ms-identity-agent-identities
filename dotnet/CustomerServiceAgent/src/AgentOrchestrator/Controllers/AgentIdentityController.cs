@@ -87,6 +87,18 @@ namespace api.Controllers
 		/// Create a new Agent Identity with the specified name (for the current Agent Application).
 		/// Optionally create a new agent user identity.
 		/// </summary>
+		/// <param name="agentIdentityName">The app registration name for the new agent identity. This is required.</param>
+		/// <param name="agentUserIdentityUpn">Optional user principal name (UPN) for creating an agent user identity associated with the agent identity. If provided, an agent user identity will be created.</param>
+		/// <returns>
+		/// An object containing:
+		/// - AgentIdentity: The newly created agent identity with its ID and details
+		/// - AgentUserIdentity: The newly created agent user identity (if agentUserIdentityUpn was provided), or null
+		/// - AdminConsentUrlScopes: URL for admin consent with delegated permissions (scopes)
+		/// - AdminConsentUrlRoles: URL for admin consent with application permissions (roles)
+		/// </returns>
+		/// <response code="200">Returns the newly created agent identity and related information</response>
+		/// <response code="400">If the agentIdentityName is null or invalid</response>
+		/// <response code="500">If there's an error creating the agent identity or agent user identity in Microsoft Graph</response>
 		[HttpPost]
 		public async Task<IActionResult> Post([FromQuery] string agentIdentityName, [FromQuery] string? agentUserIdentityUpn = null)
 		{
@@ -104,8 +116,8 @@ namespace api.Controllers
 				{
 					displayName = agentIdentityName,
 					agentIdentityBlueprintId = agentApplicationId,
-					sponsorsOdataBind = [$"https://graph.microsoft.com/v1.0/users/{sponsorUserId}"],
-					ownersOdataBind = [$"https://graph.microsoft.com/v1.0/users/{sponsorUserId}"],
+					sponsorsOdataBind = [$"https://graph.microsoft.com/v1.0/users/{Uri.EscapeDataString(sponsorUserId)}"],
+					ownersOdataBind = [$"https://graph.microsoft.com/v1.0/users/{Uri.EscapeDataString(sponsorUserId)}"],
 				}
 				);
 
@@ -133,9 +145,10 @@ namespace api.Controllers
 							   options.RelativePath = "/beta/users";
 						   });
 
-					adminConsentUrlScopes = $"https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent?client_id={newAgentIdentity.id}&scope={string.Join("%20", scopesToRequest)}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
-					adminConsentUrlRoles = $"https://login.microsoftonline.com/{tenantId}/v2.0/adminconsent?client_id={newAgentIdentity.id}&role={string.Join("%20", rolesToRequest)}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
-				}
+				var agentId = newAgentIdentity?.id ?? string.Empty;
+				adminConsentUrlScopes = $"https://login.microsoftonline.com/{Uri.EscapeDataString(tenantId)}/v2.0/adminconsent?client_id={Uri.EscapeDataString(agentId)}&scope={string.Join("%20", scopesToRequest.Select(Uri.EscapeDataString))}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
+				adminConsentUrlRoles = $"https://login.microsoftonline.com/{Uri.EscapeDataString(tenantId)}/v2.0/adminconsent?client_id={Uri.EscapeDataString(agentId)}&role={string.Join("%20", rolesToRequest.Select(Uri.EscapeDataString))}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
+			}
 
 				_logger.LogInformation("Successfully created agent identity: {AgentIdentityId}", newAgentIdentity!.id);
 				return Ok(new { AgentIdentity = newAgentIdentity, AgentUserIdentity = newAgentUserId, adminConsentUrlScopes = adminConsentUrlScopes, adminConsentUrlRoles = adminConsentUrlRoles });
@@ -164,8 +177,16 @@ namespace api.Controllers
 
 
 
-		// Get the list of Agent Identities associated with the current agent application (on behalf of the current user)
-		// GET: api/<AgentIdentity>
+		/// <summary>
+		/// Get the list of Agent Identities associated with the current agent application.
+		/// This operation is performed on behalf of the agent application using app-only permissions.
+		/// </summary>
+		/// <returns>
+		/// A collection of agent identities associated with the current agent application, or null if an error occurs.
+		/// Each agent identity includes its ID, display name, and other metadata.
+		/// </returns>
+		/// <response code="200">Returns the list of agent identities</response>
+		/// <response code="500">If there's an error retrieving agent identities from Microsoft Graph</response>
 		[HttpGet]
 		public async Task<ActionResult<IEnumerable<AgentIdentity>>> Get()
 		{
@@ -195,8 +216,17 @@ namespace api.Controllers
 		}
 
 
-		// Delete an Agent Identity by ID (on behalf of the agent application)
-		// DELETE api/<AgentIdentity>/5
+		/// <summary>
+		/// Delete an Agent Identity by its unique identifier.
+		/// This operation is performed on behalf of the agent application using app-only permissions.
+		/// </summary>
+		/// <param name="id">The unique identifier (GUID) of the agent identity to delete. This is required and should be a valid agent identity ID.</param>
+		/// <returns>
+		/// A string representation of the delete operation result. Returns null if the deletion fails.
+		/// </returns>
+		/// <response code="200">Returns the result of the delete operation</response>
+		/// <response code="404">If the agent identity with the specified ID is not found</response>
+		/// <response code="500">If there's an error deleting the agent identity from Microsoft Graph</response>
 		[HttpDelete("{id}")]
 		public async Task<IActionResult> Delete(string id)
 		{
