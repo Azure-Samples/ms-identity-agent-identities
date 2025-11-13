@@ -71,14 +71,10 @@ dotnet run --project src/CustomerServiceAgent.AppHost
 curl -X POST http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn={{agentuser1}}@{{TenantName}}
 
 # Run the customer service process endpoint ({{AgentIdentity}} is the GUID of the agent identity you created from the previous step)
-curl http://localhost:5081/api/customerservice/process
-Accept: application/json
-Content-Type: application/json
-{
- "OrderId": "12345",
- "UserUpn" : "{{agentuser1}}@{{TenantName}}",
- "AgentIdentity": "{{AgentIdentity}}"
-}
+curl -X POST http://localhost:5081/api/customerservice/process \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"OrderId": "12345", "UserUpn": "{{agentuser1}}@{{TenantName}}", "AgentIdentity": "{{AgentIdentity}}"}'
 
 ```
 
