@@ -1,6 +1,6 @@
 # Microsoft Identity - Agent Identities Samples
 
-This repository contains samples demonstrating how to use **Agent Identities** in Microsoft Entra ID with Microsoft Identity Web. Agent Identities enable AI agents to securely access downstream services using either autonomous (app-only) or user-delegated tokens.
+This repository contains samples demonstrating how to use **Agent Identities** in Microsoft Entra ID with .NET. Agent Identities enable AI agents to securely access downstream services using either autonomous (app-only) or user-delegated tokens.
 
 ## 📦 Samples
 
@@ -9,9 +9,9 @@ This repository contains samples demonstrating how to use **Agent Identities** i
 [![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
 
 A comprehensive sample showcasing how an AI agent orchestrates multiple downstream APIs using:
-- **Autonomous Agent Identity** (Order API - read operations)
-- **Agent User Identities** with user context (Shipping & Email APIs - write operations)
-- **.NET Aspire** for distributed tracing, logging, and service orchestration
+- **Autonomous Agent Identity** (Order API)
+- **Agent User Identities** with user agent context (Shipping & Email APIs - write operations)
+- **.NET Aspire** helps you understand what happens thanks to the distributed tracing, logging, and service orchestration
 - **In-memory stores** for quick setup without external dependencies
 
 **Perfect for:** Microsoft Ignite 2025 - 30-minute hands-on lab
@@ -22,7 +22,7 @@ A comprehensive sample showcasing how an AI agent orchestrates multiple downstre
 
 ## 🎯 What are Agent Identities?
 
-**Agent Identities** are a new capability in Microsoft Entra ID that enable AI agents to:
+**Agent Identities** are a new capability announced at Ignite 2025, in Microsoft Entra ID that enable AI agents to:
 
 1. **Autonomous Agent Identity** - Acquire app-only tokens for operations that don't require user context.
 2. **Agent User Identity** - Acquire tokens with user context for operations requiring user identity (e.g., sending emails, participating in Teams channels)
@@ -56,9 +56,30 @@ cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
 # Install .NET aspire if needed
 dotnet workload install aspire
 
+# Create an Agent blueprint and configure the project
+cd scripts
+.\Setup-EntraIdApps.ps1 -TenantId 31a58c3b-ae9c-4448-9e8f-e9e143e800df -OutputFormat UpdateConfig
+cd ..
+
 # Build and run
 dotnet build
 dotnet run --project src/CustomerServiceAgent.AppHost
+
+# Let the agent blueprint create an agent identity and agent user identity
+# you can run dotnet/CustomerServiceAgent/src/AgentOrchestrator/AgentOrchestrator.http from
+# Visual Studio./
+curl http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn={{agentuser1}}@{{TenantName}}
+
+# Run the customer service process endpoint ({{AgentIdentity}} is the GUID of the agent identity you created from the previous step)
+curl http://localhost:5081/api/customerservice/process
+Accept: application/json
+Content-Type: application/json
+{
+ "OrderId": "12345",
+ "UserUpn" : "{{agentuser1}}@{{TenantName}}",
+ "AgentIdentity": "{{AgentIdentity}}"
+}
+
 ```
 
 ---
