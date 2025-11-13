@@ -14,7 +14,7 @@
     The Azure AD tenant ID. If not provided, uses the currently connected tenant.
 
 .PARAMETER SampleInstancePrefix
-    Prefix for all created app registrations (default: "CustomerService-").
+    Prefix for all created app registrations (default: "CustomerServiceSample-").
     Use this to create multiple isolated instances of the sample in the same tenant.
     Example: -SampleInstancePrefix "MyDemo-" creates "MyDemo-Orchestrator", "MyDemo-OrderAPI", etc.
 

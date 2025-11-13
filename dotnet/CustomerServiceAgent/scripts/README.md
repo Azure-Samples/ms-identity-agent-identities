@@ -130,7 +130,7 @@ $SponsorUserId = "99999999-aaaa-bbbb-cccc-dddddddddddd"
 ```json
 {
   "TenantId": "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6",
-  "SampleInstancePrefix": "CustomerService-",
+  "SampleInstancePrefix": "CustomerServiceSample-",
   "Blueprint": {
     "ClientId": "11111111-2222-3333-4444-555555555555",
     "ClientSecret": "abc123...",
@@ -145,11 +145,11 @@ $SponsorUserId = "99999999-aaaa-bbbb-cccc-dddddddddddd"
   },
   "AutonomousAgent": {
     "Id": "MANUAL_SETUP_REQUIRED",
-    "Name": "CustomerService-AutonomousAgent"
+    "Name": "CustomerServiceSample-AutonomousAgent"
   },
   "AgentUser": {
     "Id": "MANUAL_SETUP_REQUIRED",
-    "Name": "CustomerService-AgentUser"
+    "Name": "CustomerServiceSample-AgentUser"
   },
   "SponsorUserId": "99999999-aaaa-bbbb-cccc-dddddddddddd"
 }
@@ -186,7 +186,7 @@ This will update all `appsettings.json` files automatically with the generated v
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `TenantId` | String | No | Current tenant | The Azure AD tenant ID to use |
-| `SampleInstancePrefix` | String | No | `CustomerService-` | Prefix for all app registrations (enables multiple instances) |
+| `SampleInstancePrefix` | String | No | `CustomerServiceSample-` | Prefix for all app registrations (enables multiple instances) |
 | `OutputFormat` | String | No | `PowerShell` | Output format: `PowerShell`, `Json`, `EnvVars`, or `UpdateConfig` |
 | `SkipAgentIdentities` | Switch | No | False | Skip Agent Identity creation |
 | `ServiceAccountUpn` | String | No | None | UPN for agent user service account |
@@ -202,14 +202,14 @@ The script performs the following operations in order:
 
 ### 2. Create Agent Identity Blueprint Application (5 minutes)
 Creates the orchestrator application that will serve as the Agent Identity Blueprint:
-- ✅ `CustomerService-Orchestrator` (or custom prefix)
+- ✅ `CustomerServiceSample-Orchestrator` (or custom prefix)
 - ✅ Adds client secret to the blueprint application
 
 ### 3. Create Downstream Service Applications (10 minutes)
 Creates the following app registrations:
-- ✅ `CustomerService-OrderAPI` (or custom prefix)
-- ✅ `CustomerService-ShippingAPI`
-- ✅ `CustomerService-EmailAPI`
+- ✅ `CustomerServiceSample-OrderAPI` (or custom prefix)
+- ✅ `CustomerServiceSample-ShippingAPI`
+- ✅ `CustomerServiceSample-EmailAPI`
 
 ### 4. Configure API Scopes (5 minutes)
 For each service, configures:
@@ -334,7 +334,7 @@ Install-Module Microsoft.Graph -Scope CurrentUser -Force
 
 **Solution**:
 1. Sign in to [Azure Portal](https://portal.azure.com)
-2. Navigate to **App registrations** → **CustomerService-Orchestrator**
+2. Navigate to **App registrations** → **CustomerServiceSample-Orchestrator**
 3. Click **API permissions**
 4. Click **Grant admin consent for [Your Tenant]**
 
@@ -374,7 +374,7 @@ After running the script:
 1. **Verify Configuration**
    ```powershell
    # Check that apps were created
-   Get-MgApplication -Filter "startswith(displayName, 'CustomerService-')"
+   Get-MgApplication -Filter "startswith(displayName, 'CustomerServiceSample-')"
    ```
 
 2. **Update Configuration** (if not using `-OutputFormat UpdateConfig`)

@@ -41,7 +41,7 @@ To enable Agent Identities, you need to:
 1. Navigate to [Azure Portal](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations**
 2. Click **New registration**
 3. Configure:
-   - **Name:** `CustomerService-Orchestrator`
+   - **Name:** `CustomerServiceSample-Orchestrator`
    - **Supported account types:** Single tenant
    - **Redirect URI:** Leave blank
 4. Click **Register**
@@ -62,9 +62,9 @@ Repeat for each downstream service:
 
 | Service | App Name |
 |---------|----------|
-| Order Service | `CustomerService-OrderAPI` |
-| Shipping Service | `CustomerService-ShippingAPI` |
-| Email Service | `CustomerService-EmailAPI` |
+| Order Service | `CustomerServiceSample-OrderAPI` |
+| Shipping Service | `CustomerServiceSample-ShippingAPI` |
+| Email Service | `CustomerServiceSample-EmailAPI` |
 
 For each:
 1. **App registrations** → **New registration**
@@ -127,7 +127,7 @@ For **Order Service only** (required for autonomous agent identity):
 2. Select **API permissions**
 3. Click **Add a permission** → **My APIs**
 4. For each downstream service:
-   - Select the service (e.g., `CustomerService-OrderAPI`)
+   - Select the service (e.g., `CustomerServiceSample-OrderAPI`)
    - For **Order Service**:
      - Check **Application permissions**
      - Select `Orders.Read.All` (for autonomous agent access)
