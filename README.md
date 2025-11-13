@@ -71,7 +71,7 @@ devenv CustomerServiceAgent.sln
 # 2. Set CustomerServiceAgent.AppHost as the default project
 # 3. Run the solution (Debug | Start Debugging)
 # 4. Observe the Aspire dashbard. You can also goto Traces and select the Agent Orchestrator resource
-# 5. In Visual studio, ppen the src/AgentOrchestrator/AgentOrchestrator.http file
+# 5. In Visual studio, open the src/AgentOrchestrator/AgentOrchestrator.http file
 # 6. Click the "Send request" link to call the api/agentidentity endpoint
 # 7. From the Api call result pane copy the agentidentity.id to the @AgentIdentity value of the AgentOrchestrator.http file
 #    (therefore replacing RESULT_FROM_FIRST_REQUEST) by a GUID
