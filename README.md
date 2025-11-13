@@ -67,7 +67,7 @@ dotnet run --project src/CustomerServiceAgent.AppHost
 
 # Let the agent blueprint create an agent identity and agent user identity
 # you can run dotnet/CustomerServiceAgent/src/AgentOrchestrator/AgentOrchestrator.http from
-# Visual Studio./
+# Visual Studio
 curl -X POST http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn={{agentuser1}}@{{TenantName}}
 
 # Run the customer service process endpoint ({{AgentIdentity}} is the GUID of the agent identity you created from the previous step)
