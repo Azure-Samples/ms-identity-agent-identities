@@ -84,7 +84,7 @@ devenv CustomerServiceAgent.sln
 # 1. Build and run the ASPIRE project (the agent and the downstream APIs)
 dotnet build
 $aspireHost = dotnet run --project src/CustomerServiceAgent.AppHost &
-Job-Receive -Id $apsireHost.Id
+Job-Receive -Id $aspireHost.Id
 
 # 2. Let the agent blueprint create an agent identity (agentidentity1) and agent user identity (agentuser1@yourtenant)
 $agentIdCreation = curl -X POST http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@yourdomain.onmicrosoft.com
