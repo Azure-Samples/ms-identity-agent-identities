@@ -22,7 +22,7 @@ A comprehensive sample showcasing how an AI agent orchestrates multiple downstre
 
 ## 🎯 What are Agent Identities?
 
-**Agent Identities** are a new capability announced at Ignite 2025, in Microsoft Entra ID that enable AI agents to:
+**Agent Identities** are a new capability announced at Ignite 2025 in Microsoft Entra ID that enable AI agents to:
 
 1. **Autonomous Agent Identity** - Acquire app-only tokens for operations that don't require user context.
 2. **Agent User Identity** - Acquire tokens with user context for operations requiring user identity (e.g., sending emails, participating in Teams channels)
