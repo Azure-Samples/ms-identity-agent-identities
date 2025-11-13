@@ -101,7 +101,7 @@ foreach ($url in $urls) {
 curl -X POST http://localhost:5081/api/customerservice/process \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
-  -d '{"OrderId": "12345", "UserUpn": "{agentuser1@yourdomain.onmicrosoft.com}", "AgentIdentity": "{{$agentIdCreation.agentIdentity.Id}}"}'
+  -d '{"OrderId": "12345", "UserUpn": "{agentuser1@yourdomain.onmicrosoft.com}", "AgentIdentity": "{{$agentIdCreation.agentIdentity.id}}"}'
 
 ```
 
