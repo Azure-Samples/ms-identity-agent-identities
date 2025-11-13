@@ -58,7 +58,7 @@ dotnet workload install aspire
 
 # Create an Agent blueprint and configure the project
 cd scripts
-.\Setup-EntraIdApps.ps1 -TenantId 31a58c3b-ae9c-4448-9e8f-e9e143e800df -OutputFormat UpdateConfig
+.\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
 cd ..
 
 # Build and run
