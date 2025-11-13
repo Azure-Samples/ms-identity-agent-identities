@@ -92,7 +92,7 @@ $agentIdCreation = curl -X POST http://localhost:5081/api/agentidentity?agentIde
 # Look at the result
 $agentIdCreation | ConvertTo-Json
 
-# Grand admin consent for the scopes
+# Grant admin consent for the scopes
 $urls = @($agentIdCreation.adminConsentUrlScopes, $agentIdCreation.adminConsentUrlRoles)
 foreach ($url in $urls) {
        Start-Process $url
