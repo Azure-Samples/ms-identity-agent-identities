@@ -129,21 +129,55 @@ namespace api.Controllers
 				{
 					_logger.LogInformation("Creating agent user identity with UPN: {AgentUserIdentityUpn}", SanitizeForLog(agentUserIdentityUpn));
 
-					// Call the downstream API (canary Graph) with a POST request to create an Agent Identity
-					newAgentUserId = await DownstreamApi.PostForAppAsync<AgentUserIdentity, AgentUserIdentity>(
-						   "msGraphAgentIdentity",
-						   new AgentUserIdentity
-						   {
-							   displayName = agentUserIdentityUpn.Substring(0, agentUserIdentityUpn.IndexOf('@', StringComparison.Ordinal)),
-							   mailNickname = agentUserIdentityUpn.Substring(0, agentUserIdentityUpn.IndexOf('@', StringComparison.Ordinal)),
-							   userPrincipalName = agentUserIdentityUpn,
-							   accountEnabled = true,
-							   identityParentId = newAgentIdentity!.id
-						   },
-						   options =>
-						   {
-							   options.RelativePath = "/beta/users";
-						   });
+
+					// Retry logic for agent user identity creation (may fail with 400 if agent identity hasn't replicated yet)
+					const int maxRetries = 2;
+					int retryCount = 0;
+					bool success = false;
+
+					while (!success && retryCount <= maxRetries)
+					{
+						try
+						{
+							// Call the downstream API (canary Graph) with a POST request to create an Agent User Identity
+							newAgentUserId = await DownstreamApi.PostForAppAsync<AgentUserIdentity, AgentUserIdentity>(
+								   "msGraphAgentIdentity",
+								   new AgentUserIdentity
+								   {
+									   displayName = agentUserIdentityUpn.Substring(0, agentUserIdentityUpn.IndexOf('@', StringComparison.Ordinal)),
+									   mailNickname = agentUserIdentityUpn.Substring(0, agentUserIdentityUpn.IndexOf('@', StringComparison.Ordinal)),
+									   userPrincipalName = agentUserIdentityUpn,
+									   accountEnabled = true,
+									   identityParentId = newAgentIdentity!.id
+								   },
+								   options =>
+								   {
+									   options.RelativePath = "/beta/users";
+								   });
+
+							success = true;
+							_logger.LogInformation("Successfully created agent user identity on attempt {Attempt}", retryCount + 1);
+						}
+						catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.BadRequest && retryCount < maxRetries)
+						{
+							retryCount++;
+							_logger.LogWarning("Agent user identity creation failed with HTTP 400 (attempt {Attempt}/{MaxAttempts}). Waiting 5 seconds for agent identity replication...", 
+								retryCount, maxRetries + 1);
+							await Task.Delay(5000);
+						}
+						catch
+						{
+							// Re-throw other exceptions to be handled by outer catch blocks
+							throw;
+						}
+					}
+
+					if (!success)
+					{
+						_logger.LogError("Failed to create agent user identity after {MaxAttempts} attempts", maxRetries + 1);
+						throw new HttpRequestException("Failed to create agent user identity after multiple attempts. The agent identity may not have replicated yet.", 
+							null, System.Net.HttpStatusCode.BadRequest);
+					}
 
 				var agentId = newAgentIdentity?.id ?? string.Empty;
 				adminConsentUrlScopes = $"https://login.microsoftonline.com/{Uri.EscapeDataString(tenantId)}/v2.0/adminconsent?client_id={Uri.EscapeDataString(agentId)}&scope={string.Join("%20", scopesToRequest.Select(Uri.EscapeDataString))}&redirect_uri=https://entra.microsoft.com/TokenAuthorize&state=xyz123";
