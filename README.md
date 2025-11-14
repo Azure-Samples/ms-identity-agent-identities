@@ -57,9 +57,7 @@ cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
 dotnet workload install aspire
 
 # Create an Agent blueprint, the three downstream APIs, and configure the projects appsettings.json
-cd scripts
-$result = .\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
-cd ..
+$result = .\scripts\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
 
 ## If you use Visual Studio
 ## ------------------------
@@ -70,8 +68,8 @@ devenv CustomerServiceAgent.sln
 # 1. Build the solution
 # 2. Set CustomerServiceAgent.AppHost as the default project
 # 3. Run the solution (Debug | Start Debugging)
-# 4. Observe the Aspire dashbard. You can also goto Traces and select the Agent Orchestrator resource
-# 5. In Visual studio, ppen the src/AgentOrchestrator/AgentOrchestrator.http file
+# 4. Observe the Aspire dashboard. You can also goto Traces and select the Agent Orchestrator resource
+# 5. In Visual studio, open the src/AgentOrchestrator/AgentOrchestrator.http file
 # 6. Click the "Send request" link to call the api/agentidentity endpoint
 # 7. From the Api call result pane copy the agentidentity.id to the @AgentIdentity value of the AgentOrchestrator.http file
 #    (therefore replacing RESULT_FROM_FIRST_REQUEST) by a GUID
@@ -84,7 +82,9 @@ devenv CustomerServiceAgent.sln
 # 1. Build and run the ASPIRE project (the agent and the downstream APIs)
 dotnet build
 $aspireHost = dotnet run --project src/CustomerServiceAgent.AppHost &
-Job-Receive -Id $apsireHost.Id
+Receive-Job -Id $aspireHost.Id
+
+# You can navigaye to ehe dashboard which URL is presented in the console.
 
 # 2. Let the agent blueprint create an agent identity (agentidentity1) and agent user identity (agentuser1@yourtenant)
 $agentIdCreation = curl -X POST http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@yourdomain.onmicrosoft.com
@@ -92,8 +92,8 @@ $agentIdCreation = curl -X POST http://localhost:5081/api/agentidentity?agentIde
 # Look at the result
 $agentIdCreation | ConvertTo-Json
 
-# Grand admin consent for the scopes
-urls = @($agentIdCreation.adminConsentUrlScopes, $agentIdCreation.adminConsentUrlRoles)
+# Grant admin consent for the scopes
+$urls = @($agentIdCreation.adminConsentUrlScopes, $agentIdCreation.adminConsentUrlRoles)
 foreach ($url in $urls) {
        Start-Process $url
 
@@ -101,7 +101,7 @@ foreach ($url in $urls) {
 curl -X POST http://localhost:5081/api/customerservice/process \
   -H "Accept: application/json" \
   -H "Content-Type: application/json" \
-  -d '{"OrderId": "12345", "UserUpn": "{agentuser1@yourdomain.onmicrosoft.com}", "AgentIdentity": "{{$agentIdCreation.agentIdentity.Id}}"}'
+  -d '{"OrderId": "12345", "UserUpn": "{agentuser1@yourdomain.onmicrosoft.com}", "AgentIdentity": "{{$agentIdCreation.agentIdentity.id}}"}'
 
 ```
 
