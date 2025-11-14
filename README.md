@@ -57,9 +57,7 @@ cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
 dotnet workload install aspire
 
 # Create an Agent blueprint, the three downstream APIs, and configure the projects appsettings.json
-cd scripts
-$result = .\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
-cd ..
+$result = .\scripts\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
 
 ## If you use Visual Studio
 ## ------------------------
@@ -84,7 +82,9 @@ devenv CustomerServiceAgent.sln
 # 1. Build and run the ASPIRE project (the agent and the downstream APIs)
 dotnet build
 $aspireHost = dotnet run --project src/CustomerServiceAgent.AppHost &
-Job-Receive -Id $aspireHost.Id
+Receive-Job -Id $aspireHost.Id
+
+# You can navigaye to ehe dashboard which URL is presented in the console.
 
 # 2. Let the agent blueprint create an agent identity (agentidentity1) and agent user identity (agentuser1@yourtenant)
 $agentIdCreation = curl -X POST http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@yourdomain.onmicrosoft.com
