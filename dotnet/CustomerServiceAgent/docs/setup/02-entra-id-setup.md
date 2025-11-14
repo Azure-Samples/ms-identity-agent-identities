@@ -156,35 +156,15 @@ For **Order Service only** (required for autonomous agent identity):
 
 ### Step 6: Create Blueprint
 
-1. Navigate to **Microsoft Entra ID** → **Identity Governance** (or search for "Agent Identities")
-2. Select **Agent Identity Blueprints**
-3. Click **New blueprint**
-4. Configure:
-   - **Name:** `CustomerServiceAgentBlueprint`
-   - **Description:** `Blueprint for customer service agents`
-5. Click **Create**
-6. Note the **Blueprint ID**
+See [Create an agent identity blueprint](https://learn.microsoft.com/entra/agentic-identity-platform/create-blueprint.md)
 
 ### Step 7: Create Autonomous Agent Identity
 
-1. In the blueprint, click **Create agent identity**
-2. **Type:** Autonomous Agent
-3. Configure:
-   - **Name:** `CustomerServiceAutonomousAgent`
-   - **Description:** `Autonomous agent for read operations`
-4. Click **Create**
-5. Note the **Agent Identity ID**
+See [Create an agent identity blueprint](https://learn.microsoft.com/entra/agentic-identity-platform/create-delete-agent-identities.md#create-an-agent-identity)
 
 ### Step 8: Create Agent User Identity
 
-1. In the blueprint, click **Create agent identity**
-2. **Type:** Agent User
-3. Configure:
-   - **Name:** `CustomerServiceAgentUser`
-   - **Description:** `Agent user for write operations`
-   - **Associated User:** Select or create a service account (e.g., `csr-agent@yourdomain.com`)
-4. Click **Create**
-5. Note the **Agent User Identity ID**
+See [Create an agent identity blueprint](https://learn.microsoft.com/entra/agentic-identity-platform/autonomous-agent-request-agent-user-tokens.md#create-an-agent-user)
 
 ---
 

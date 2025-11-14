@@ -1,6 +1,6 @@
 # Microsoft Identity - Agent Identities Samples
 
-This repository contains samples demonstrating how to use **Agent Identities** in Microsoft Entra ID with Microsoft Identity Web. Agent Identities enable AI agents to securely access downstream services using either autonomous (app-only) or user-delegated tokens.
+This repository contains samples demonstrating how to use **Agent Identities** in Microsoft Entra ID with .NET. Agent Identities enable AI agents to securely access downstream services using either autonomous (app-only) or user-delegated tokens.
 
 ## 📦 Samples
 
@@ -9,9 +9,9 @@ This repository contains samples demonstrating how to use **Agent Identities** i
 [![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
 
 A comprehensive sample showcasing how an AI agent orchestrates multiple downstream APIs using:
-- **Autonomous Agent Identity** (Order API - read operations)
-- **Agent User Identities** with user context (Shipping & Email APIs - write operations)
-- **.NET Aspire** for distributed tracing, logging, and service orchestration
+- **Autonomous Agent Identity** (Order API)
+- **Agent User Identities** with user agent context (Shipping & Email APIs - write operations)
+- **.NET Aspire** helps you understand what happens thanks to the distributed tracing, logging, and service orchestration
 - **In-memory stores** for quick setup without external dependencies
 
 **Perfect for:** Microsoft Ignite 2025 - 30-minute hands-on lab
@@ -22,7 +22,7 @@ A comprehensive sample showcasing how an AI agent orchestrates multiple downstre
 
 ## 🎯 What are Agent Identities?
 
-**Agent Identities** are a new capability in Microsoft Entra ID that enable AI agents to:
+**Agent Identities** are a new capability announced at Ignite 2025 in Microsoft Entra ID that enable AI agents to:
 
 1. **Autonomous Agent Identity** - Acquire app-only tokens for operations that don't require user context.
 2. **Agent User Identity** - Acquire tokens with user context for operations requiring user identity (e.g., sending emails, participating in Teams channels)
@@ -56,9 +56,53 @@ cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
 # Install .NET aspire if needed
 dotnet workload install aspire
 
-# Build and run
+# Create an Agent blueprint, the three downstream APIs, and configure the projects appsettings.json
+$result = .\scripts\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
+
+## If you use Visual Studio
+## ------------------------
+#Open the solution
+devenv CustomerServiceAgent.sln
+
+# and then:
+# 1. Build the solution
+# 2. Set CustomerServiceAgent.AppHost as the default project
+# 3. Run the solution (Debug | Start Debugging)
+# 4. Observe the Aspire dashboard. You can also goto Traces and select the Agent Orchestrator resource
+# 5. In Visual studio, open the src/AgentOrchestrator/AgentOrchestrator.http file
+# 6. Click the "Send request" link to call the api/agentidentity endpoint
+# 7. From the Api call result pane copy the agentidentity.id to the @AgentIdentity value of the AgentOrchestrator.http file
+#    (therefore replacing RESULT_FROM_FIRST_REQUEST) by a GUID
+# 8. Call the api/customerservice/process link in the AgentOrchestrator.http. the code of the agent calls the downstream
+#    APIs.
+
+
+## If you are not using Visual Studio
+# -----------------------------------
+# 1. Build and run the ASPIRE project (the agent and the downstream APIs)
 dotnet build
-dotnet run --project src/CustomerServiceAgent.AppHost
+$aspireHost = dotnet run --project src/CustomerServiceAgent.AppHost &
+Receive-Job -Id $aspireHost.Id
+
+# You can navigate to the dashboard whose URL is presented in the console.
+
+# 2. Let the agent blueprint create an agent identity (agentidentity1) and agent user identity (agentuser1@yourtenant)
+$agentIdCreation = curl -X POST http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@yourdomain.onmicrosoft.com
+
+# Look at the result
+$agentIdCreation | ConvertTo-Json
+
+# Grant admin consent for the scopes
+$urls = @($agentIdCreation.adminConsentUrlScopes, $agentIdCreation.adminConsentUrlRoles)
+foreach ($url in $urls) {
+       Start-Process $url
+
+# Run the customer service process endpoint ({{AgentIdentity}} is the GUID of the agent identity you created from the previous step)
+curl -X POST http://localhost:5081/api/customerservice/process \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"OrderId": "12345", "UserUpn": "{agentuser1@yourdomain.onmicrosoft.com}", "AgentIdentity": "{{$agentIdCreation.agentIdentity.id}}"}'
+
 ```
 
 ---
