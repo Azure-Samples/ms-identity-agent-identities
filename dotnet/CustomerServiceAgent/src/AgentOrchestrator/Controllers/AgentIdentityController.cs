@@ -27,6 +27,8 @@ namespace api.Controllers
 		private static readonly System.Text.RegularExpressions.Regex LogSanitizationRegex =
 		new(@"[\r\n\t\x00-\x1F\x7F]", System.Text.RegularExpressions.RegexOptions.Compiled);
 
+		// Delay in milliseconds between retry attempts when creating agent user identity
+		private const int RetryDelayMilliseconds = 5000;
 
 		public AgentIdentityController(
 			IConfiguration configuration,
@@ -163,7 +165,7 @@ namespace api.Controllers
 							retryCount++;
 							_logger.LogWarning("Agent user identity creation failed with HTTP 400 (attempt {Attempt}/{MaxAttempts}). Waiting 5 seconds for agent identity replication...", 
 								retryCount, maxRetries + 1);
-							await Task.Delay(5000);
+							await Task.Delay(RetryDelayMilliseconds);
 						}
 						catch
 						{
