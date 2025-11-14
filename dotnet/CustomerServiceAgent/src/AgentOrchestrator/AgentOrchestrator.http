@@ -1,5 +1,5 @@
 @AgentOrchestrator_HostAddress = http://localhost:5081
-@TenantName=msidlabtoint.onmicrosoft.com
+@TenantName=YOURDOMAIN.onmicrosoft.com
 @AgentIdentity=RESULT_FROM_FIRST_REQUEST
 @AgentUserName=agentuser1
 
