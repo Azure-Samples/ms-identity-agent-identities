@@ -84,7 +84,7 @@ dotnet build
 $aspireHost = dotnet run --project src/CustomerServiceAgent.AppHost &
 Receive-Job -Id $aspireHost.Id
 
-# You can navigaye to ehe dashboard which URL is presented in the console.
+# You can navigate to the dashboard whose URL is presented in the console.
 
 # 2. Let the agent blueprint create an agent identity (agentidentity1) and agent user identity (agentuser1@yourtenant)
 $agentIdCreation = curl -X POST http://localhost:5081/api/agentidentity?agentIdentityName=agent%20identity1&agentUserIdentityUpn=agentuser1@yourdomain.onmicrosoft.com

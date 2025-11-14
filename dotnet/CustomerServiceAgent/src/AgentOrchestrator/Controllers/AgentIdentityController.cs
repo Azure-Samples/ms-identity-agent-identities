@@ -163,8 +163,8 @@ namespace api.Controllers
 						catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.BadRequest && retryCount < maxRetries)
 						{
 							retryCount++;
-							_logger.LogWarning("Agent user identity creation failed with HTTP 400 (attempt {Attempt}/{MaxAttempts}). Waiting 5 seconds for agent identity replication...", 
-								retryCount, maxRetries + 1);
+							_logger.LogWarning("Agent user identity creation failed with HTTP 400 (attempt {Attempt}/{MaxAttempts}). Waiting {DelaySeconds} seconds for agent identity replication...", 
+								retryCount, maxRetries + 1, RetryDelayMilliseconds / 1000);
 							await Task.Delay(RetryDelayMilliseconds);
 						}
 						catch
