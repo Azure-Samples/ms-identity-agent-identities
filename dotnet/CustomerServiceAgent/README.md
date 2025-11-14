@@ -76,6 +76,10 @@ graph TB
    git clone https://github.com/Azure-Samples/ms-identity-agent-identities.git
    cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
    ```
+   The first time you want to run the project, go through the [🔐 Setting Up Agent Identities (Visual Studio)](#-setting-up-agent-identities-visual-studio) 
+   section below to setup the applications.
+
+   The following times, you can do as follows:
 
 2. **Build the solution**
    ```bash
