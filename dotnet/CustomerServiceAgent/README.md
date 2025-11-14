@@ -76,6 +76,10 @@ graph TB
    git clone https://github.com/Azure-Samples/ms-identity-agent-identities.git
    cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
    ```
+   The first time you want to run the project, go through the [🔐 Setting Up Agent Identities (Visual Studio)](#-setting-up-agent-identities-visual-studio) 
+   section below to setup the applications.
+
+   The following times, you can do as follows:
 
 2. **Build the solution**
    ```bash
@@ -103,6 +107,178 @@ graph TB
    ```
 
    Note that this endpoint is on purpose anonymous, so that you can more easily test things out. In production you would need to uncomment the [Authorize] attribute on the endpoint.
+
+## 🔐 Setting Up Agent Identities (Visual Studio)
+
+To enable real Agent Identities in Microsoft Entra ID for this sample, follow these steps to create agent blueprints, downstream API registrations, and runtime agent identities.
+
+### 1. Script Setup: Create Entra ID App Registrations
+
+Before running the sample with real agent identities, you need to register applications in Microsoft Entra ID.
+
+**Run the setup script** from the `scripts` directory:
+
+```powershell
+cd scripts
+.\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
+```
+
+**What this script creates:**
+- **Agent Identity Blueprint** (`CustomerServiceSample-Orchestrator`) - The orchestrator application that serves as the blueprint for creating agent identities
+- **Downstream API Registrations** - Three service app registrations:
+  - `CustomerServiceSample-OrderAPI` (read operations with app role)
+  - `CustomerServiceSample-ShippingAPI` (write operations with user context)
+  - `CustomerServiceSample-EmailAPI` (write operations with user context)
+- **API Permissions & Scopes** - Configured inheritable permissions for all downstream APIs
+- **Client Secrets** - Secure credentials for the blueprint application
+
+**Configuration updates:**
+- The script automatically updates all `appsettings.json` files with the generated Client IDs, Tenant ID, and secrets
+- Configuration values are placed in:
+  - `src/AgentOrchestrator/appsettings.json`
+  - `src/DownstreamServices/OrderService/appsettings.json`
+  - `src/DownstreamServices/ShippingService/appsettings.json`
+  - `src/DownstreamServices/EmailService/appsettings.json`
+
+📖 **For detailed script documentation**, see [scripts/README.md](scripts/README.md)  
+📖 **For manual setup instructions**, see [Entra ID Setup Guide](docs/setup/02-entra-id-setup.md)
+
+### 2. Starting the Sample in Visual Studio
+
+1. **Open the solution** in Visual Studio:
+   ```bash
+   cd dotnet/CustomerServiceAgent
+   devenv CustomerServiceAgent.sln
+   ```
+   
+   Or use **File → Open → Project/Solution** and select `CustomerServiceAgent.sln`
+
+2. **Build the solution**:
+   - Press `Ctrl+Shift+B` or select **Build → Build Solution**
+
+3. **Set the startup project**:
+   - Right-click `CustomerServiceAgent.AppHost` in Solution Explorer
+   - Select **Set as Startup Project**
+
+4. **Run the application**:
+   - Press `F5` or select **Debug → Start Debugging**
+   - The Aspire Dashboard will open in your browser (typically at `https://localhost:15888`)
+
+5. **Observe the Aspire Dashboard**:
+   - Navigate to **Resources** to see all running services
+   - Go to **Traces** and select the **AgentOrchestrator** resource to view distributed traces
+
+### 3. Runtime Agent Creation: Using the .http File
+
+With the application running, you'll create agent identities at runtime using the `/api/agentidentity` endpoint.
+
+1. **Open the HTTP request file** in Visual Studio:
+   - In Solution Explorer, navigate to `src/AgentOrchestrator/AgentOrchestrator.http`
+   - Double-click to open it in the editor
+
+2. **Update the tenant name** (first time only):
+   - Find the line: `@TenantName=YOURDOMAIN.onmicrosoft.com`
+   - Replace `YOURDOMAIN` with your actual tenant name
+   - Example: `@TenantName=contoso.onmicrosoft.com`
+
+3. **Execute the first request** to create agent identities:
+   - Locate the `POST {{AgentOrchestrator_HostAddress}}/api/agentidentity` request
+   - Click the **"Send request"** link that appears above the request (Visual Studio 2022 17.6+)
+   - Alternatively, press `Ctrl+Alt+H` while the cursor is on the request
+
+4. **Understand the response**:
+   The API returns JSON with several important values:
+   
+   ```json
+   {
+     "agentIdentity": {
+       "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  // 👈 Copy this GUID
+     },
+     "adminConsentUrlScopes": "https://login.microsoftonline.com/.../adminconsent?...",
+     "adminConsentUrlRoles": "https://login.microsoftonline.com/.../adminconsent?..."
+   }
+   ```
+
+5. **Copy the agent identity ID**:
+   - From the response pane, copy the `agentIdentity.id` value (a GUID)
+   - In the `AgentOrchestrator.http` file, replace `RESULT_FROM_FIRST_REQUEST` on line 3:
+     ```
+     @AgentIdentity=<paste-the-guid-here>
+     ```
+
+### 4. Admin Consent Flow: Granting Permissions
+
+The agent identities require admin consent to access downstream APIs on behalf of the agent.
+
+1. **Copy the consent URLs** from the previous API response:
+   - `adminConsentUrlScopes` - For delegated permissions (user context)
+   - `adminConsentUrlRoles` - For application permissions (app-only context)
+
+2. **Grant admin consent**:
+   - Open each URL in your browser
+   - Sign in as a **Tenant Administrator** (Global Admin or Application Admin role required)
+   - Review the requested permissions
+   - Click **Accept** to grant consent
+
+3. **Why admin consent is needed**:
+   - Agent identities inherit permissions from the blueprint but require explicit consent
+   - Delegated permissions (`Orders.Read`, `Shipping.Write`, `Email.Send`) enable the agent to act with user context
+   - Application permissions (`Orders.Read.All`) enable autonomous agent operations without user context
+
+📖 **For more details on agent identities**, see [Agent Identities Documentation](https://github.com/AzureAD/microsoft-identity-web/blob/main/src/Microsoft.Identity.Web.AgentIdentities/README.AgentIdentities.md)
+
+### 5. Testing the Full Flow: End-to-End Orchestration
+
+Now that your agent identity is configured and consented, test the complete workflow.
+
+1. **Execute the customer service process request**:
+   - In `AgentOrchestrator.http`, find the second request: `POST {{AgentOrchestrator_HostAddress}}/api/customerservice/process`
+   - Ensure `@AgentIdentity` contains your copied GUID from step 3
+   - Ensure `@TenantName` is correct
+   - Click **"Send request"** or press `Ctrl+Alt+H`
+
+2. **Review the request payload**:
+   ```json
+   {
+     "OrderId": "12345",
+     "UserUpn": "agentuser1@yourtenant.onmicrosoft.com",
+     "AgentIdentity": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+   }
+   ```
+   - `OrderId`: The order to process (exists in the in-memory store)
+   - `UserUpn`: The agent user identity UPN created by the `/api/agentidentity` endpoint
+   - `AgentIdentity`: The agent identity GUID you copied earlier
+
+3. **Confirm orchestration using Aspire Dashboard traces**:
+   - Switch to the Aspire Dashboard in your browser (`https://localhost:15888`)
+   - Navigate to **Traces**
+   - Filter by **AgentOrchestrator** resource
+   - Observe the distributed trace showing:
+     - Token acquisition using the agent identity
+     - Call to OrderService (autonomous agent identity with app role)
+     - Call to ShippingService (agent user identity with user context)
+     - Call to EmailService (agent user identity with user context)
+   
+4. **Expected successful response**:
+   ```json
+   {
+     "message": "Customer service request processed successfully",
+     "orderId": "12345",
+     "details": {
+       "orderRetrieved": true,
+       "shippingUpdated": true,
+       "emailSent": true
+     }
+   }
+   ```
+
+**Troubleshooting tips:**
+- If you get authentication errors, verify admin consent was granted for both URLs
+- If services return 401/403, check that the Entra ID apps were created correctly by the script
+- If agent identity is not found, ensure the GUID is correct in the `@AgentIdentity` variable
+- Review the Aspire Dashboard logs for detailed error messages
+
+📖 **For common issues and solutions**, see [Troubleshooting Guide](docs/troubleshooting.md)
 
 ## 📁 Project Structure
 
