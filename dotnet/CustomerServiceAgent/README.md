@@ -1,8 +1,10 @@
 # Customer Service Agent Sample - Agent Identities with .NET Aspire
 
-[![.NET 9](https://img.shields.io/badge/.NET-9.0-purple)](https://dot.net)
-[![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-purple)](https://dot.net)
+[![Aspire 13.0](https://img.shields.io/badge/Aspire-13.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
 [![Microsoft Identity Web](https://img.shields.io/badge/Identity.Web-4.0.0-green)](https://github.com/AzureAD/microsoft-identity-web)
+
+> 📝 **Note:** Looking for the .NET 9 version? It's available from the [ForNet9 release](https://github.com/Azure-Samples/ms-identity-agent-identities/releases/tag/ForNet9).
 
 A comprehensive sample demonstrating how AI agents securely call downstream services using **Agent Identities** in Microsoft Entra ID. This Customer Service Orchestration Agent showcases realistic business scenarios where an agent orchestrates multiple downstream APIs using both autonomous agent identities and agent user identities, all with full observability via .NET Aspire.
 
@@ -65,7 +67,7 @@ graph TB
 
 ### Prerequisites
 
-- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Visual Studio 2022](https://visualstudio.microsoft.com/) or [VS Code](https://code.visualstudio.com/) with C# extension
 - *(Optional)* [Microsoft 365 Developer account](https://developer.microsoft.com/microsoft-365/dev-program) for Graph API integration
 

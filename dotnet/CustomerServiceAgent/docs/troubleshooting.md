@@ -4,26 +4,28 @@ Common issues and solutions for the Customer Service Agent sample.
 
 ## Build Issues
 
-### ❌ Error: .NET 9 SDK not found
+### ❌ Error: .NET 10 SDK not found
 **Symptom:**
 ```
-error NETSDK1045: The current .NET SDK does not support targeting .NET 9.0
+error NETSDK1045: The current .NET SDK does not support targeting .NET 10.0
 ```
 
 **Solution:**
-1. Install .NET 9 SDK from https://dotnet.microsoft.com/download/dotnet/9.0
-2. Verify installation: `dotnet --version` should show `9.0.xxx`
+1. Install .NET 10 SDK from https://dotnet.microsoft.com/download/dotnet/10.0
+2. Verify installation: `dotnet --version` should show `10.0.xxx`
 3. Restart your IDE/terminal
 
-### ❌ Error: Aspire workload not installed
+### ❌ Error: Aspire packages not found
 **Symptom:**
 ```
-error: The project references the following workload packs that are not available: Aspire.Hosting.Sdk
+error: Package 'Aspire.Hosting.AppHost' version 13.0.0 could not be found
 ```
 
 **Solution:**
+Aspire 13.0+ ships via NuGet packages. Ensure you have internet connectivity and run:
 ```bash
-dotnet workload install aspire
+dotnet restore
+dotnet build
 ```
 
 ### ❌ Build warnings about package versions

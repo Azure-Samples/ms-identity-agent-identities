@@ -7,7 +7,7 @@ In this lab, you'll explore how AI agents securely call downstream services usin
 **Level:** Intermediate
 
 ## Prerequisites ✅
-- .NET 9 SDK installed
+- .NET 10 SDK installed
 - Visual Studio 2022 or VS Code with C# extension
 - Basic understanding of ASP.NET Core and REST APIs
 
@@ -259,7 +259,7 @@ Stop the Aspire AppHost by pressing `Ctrl+C` in the terminal where it's running.
 **Solution:** Change ports in `src/CustomerServiceAgent.AppHost/Program.cs`
 
 **Issue:** Build errors related to SDK version  
-**Solution:** Verify .NET 9 SDK is installed: `dotnet --version`
+**Solution:** Verify .NET 10 SDK is installed: `dotnet --version`
 
 **Issue:** Aspire Dashboard not accessible  
 **Solution:** Check console output for the correct URL, may be different than localhost:15888
