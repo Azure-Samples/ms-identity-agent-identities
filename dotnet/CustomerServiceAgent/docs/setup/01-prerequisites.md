@@ -4,29 +4,24 @@ Before running the Customer Service Agent sample, ensure you have the following 
 
 ## Required Software
 
-### 1. .NET 9 SDK
-**Required Version:** 9.0 or later
+### 1. .NET 10 SDK
+**Required Version:** 10.0 or later
 
-**Download:** https://dotnet.microsoft.com/download/dotnet/9.0
+**Download:** https://dotnet.microsoft.com/download/dotnet/10.0
 
 **Verify Installation:**
 ```bash
 dotnet --version
-# Should show: 9.0.xxx
+# Should show: 10.0.xxx
 ```
 
-### 2. .NET Aspire Workload
-**Required for:** Running the AppHost and Aspire Dashboard
+### 2. .NET Aspire
+**Note:** Starting with Aspire 13.0, Aspire ships via NuGet packages and no longer requires a separate workload installation. The packages will be automatically restored when you build the project.
 
-**Install:**
+**Verify Aspire is available:**
 ```bash
-dotnet workload install aspire
-```
-
-**Verify Installation:**
-```bash
-dotnet workload list
-# Should show: aspire   8.2.xxx/9.0.xxx
+dotnet build
+# Aspire packages will be restored automatically
 ```
 
 ### 3. IDE (Choose One)
@@ -118,8 +113,7 @@ For accessing the Aspire Dashboard:
 
 Before starting the lab, verify:
 
-- [ ] .NET 9 SDK installed and version verified
-- [ ] Aspire workload installed
+- [ ] .NET 10 SDK installed and version verified
 - [ ] IDE (Visual Studio or VS Code) installed with required extensions
 - [ ] Git installed and configured
 - [ ] At least 8 GB RAM available
@@ -136,27 +130,29 @@ Before starting the lab, verify:
 ```bash
 dotnet --list-sdks
 ```
-Ensure 9.0.xxx is listed. If not, reinstall.
+Ensure 10.0.xxx is listed. If not, reinstall.
 
 **Problem:** Command not found
 - **Windows:** Add to PATH: `C:\Program Files\dotnet`
 - **macOS/Linux:** Add to PATH: `/usr/local/share/dotnet`
 
-### Aspire Workload Issues
+### Aspire Issues
 
-**Problem:** Workload installation fails
+**Problem:** Project doesn't build due to missing Aspire packages
 ```bash
-# Try with sudo/admin privileges (Linux/macOS)
-sudo dotnet workload install aspire
+# Restore NuGet packages explicitly
+dotnet restore
 
-# Windows: Run PowerShell as Administrator
-dotnet workload install aspire
+# Then build
+dotnet build
 ```
+
+**Note:** Aspire 13.0 and later ships via NuGet packages. No workload installation is needed.
 
 ### IDE Issues
 
-**Problem:** Visual Studio doesn't recognize .NET 9
-- Update Visual Studio to latest version (17.12+)
+**Problem:** Visual Studio doesn't recognize .NET 10
+- Update Visual Studio to latest version (17.13+)
 - Tools → Options → Environment → Preview Features → Enable
 
 **Problem:** VS Code C# extension not working

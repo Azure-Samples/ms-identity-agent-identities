@@ -5,8 +5,10 @@ This repository contains samples demonstrating how to use **Agent Identities** i
 ## 📦 Samples
 
 ### [.NET Customer Service Agent with Aspire](dotnet/CustomerServiceAgent/)
-[![.NET 9](https://img.shields.io/badge/.NET-9.0-purple)](https://dot.net)
-[![Aspire 9.0](https://img.shields.io/badge/Aspire-9.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-purple)](https://dot.net)
+[![Aspire 13.0](https://img.shields.io/badge/Aspire-13.0-blue)](https://learn.microsoft.com/dotnet/aspire/)
+
+> 📝 **Note:** Looking for the .NET 9 version? It's available from the [ForNet9 release](https://github.com/Azure-Samples/ms-identity-agent-identities/releases/tag/ForNet9).
 
 A comprehensive sample showcasing how an AI agent orchestrates multiple downstream APIs using:
 - **Autonomous Agent Identity** (Order API)
@@ -40,7 +42,8 @@ This allows developers to build AI agents that can securely call downstream APIs
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (for .NET samples)
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for .NET samples)
 - Visual Studio 2022 or VS Code
 - *(Optional)* Azure subscription for cloud deployment
 - *(Optional)* Microsoft 365 Developer account if you want to try Graph API integration with Teams/Mails
@@ -52,9 +55,6 @@ git clone https://github.com/Azure-Samples/ms-identity-agent-identities.git
 
 # Navigate to a sample
 cd ms-identity-agent-identities/dotnet/CustomerServiceAgent
-
-# Install .NET aspire if needed
-dotnet workload install aspire
 
 # Create an Agent blueprint, the three downstream APIs, and configure the projects appsettings.json
 $result = .\scripts\Setup-EntraIdApps.ps1 -TenantId <your-tenant-id> -OutputFormat UpdateConfig
